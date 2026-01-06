@@ -1,0 +1,170 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>自定义验证码生成器</title>
+  <style>
+    body {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding: 30px;
+      font-family: Arial, sans-serif;
+      background: #fff;
+    }
+    #captchaCanvas {
+      border: 1px solid #ccc;
+      margin-bottom: 12px;
+      cursor: pointer;
+    }
+    input {
+      padding: 8px;
+      width: 220px;
+      text-align: center;
+      margin-bottom: 10px;
+      font-size: 16px;
+    }
+    .btn-group {
+      margin-bottom: 12px;
+    }
+    button {
+      padding: 8px 16px;
+      font-size: 16px;
+      margin: 0 4px;
+    }
+    #msg {
+      min-height: 1.4em;
+      font-size: 16px;
+      color: #d32f2f;
+    }
+  </style>
+</head>
+<body>
+
+<canvas id="captchaCanvas" width="260" height="75"></canvas>
+
+<input type="text" id="userInput" placeholder="输入6位验证码（如 A3B9X2）" autocomplete="off" maxlength="6" />
+
+<div class="btn-group">
+  <button onclick="generateFromInput()">生成指定</button>
+  <button onclick="generateRandom()">随机生成</button>
+  <button onclick="downloadCaptcha()">下载图片</button>
+</div>
+
+<p id="msg"></p>
+
+<script>
+  const VALID_CHARS = '0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ';
+  let currentCode = '';
+
+  const rainbowColors = [
+    [255, 0, 0],     // 红
+    [255, 165, 0],   // 橙
+    [255, 255, 0],   // 黄
+    [0, 255, 0],     // 绿
+    [0, 255, 255],   // 青
+    [0, 0, 255],     // 蓝
+    [128, 0, 128]    // 紫
+  ];
+
+  function getRandomChar() {
+    return VALID_CHARS.charAt(Math.floor(Math.random() * VALID_CHARS.length));
+  }
+
+  function generateRandomCode() {
+    let code = '';
+    for (let i = 0; i < 6; i++) {
+      code += getRandomChar();
+    }
+    return code;
+  }
+
+  function draw(code) {
+    const canvas = document.getElementById('captchaCanvas');
+    const ctx = canvas.getContext('2d');
+    const w = canvas.width;
+    const h = canvas.height;
+
+    ctx.clearRect(0, 0, w, h);
+
+    // === 3 根彩虹干扰线（左→右贯穿）===
+    for (let i = 0; i < 3; i++) {
+      const color = rainbowColors[Math.floor(Math.random() * rainbowColors.length)];
+      ctx.strokeStyle = `rgb(${color[0]}, ${color[1]}, ${color[2]})`;
+      ctx.lineWidth = 1.3;
+      ctx.beginPath();
+      ctx.moveTo(0, Math.random() * h);
+      ctx.lineTo(w, Math.random() * h);
+      ctx.stroke();
+    }
+
+    const startX = 25;
+    const baseY = h / 2;
+
+    for (let i = 0; i < code.length; i++) {
+      const char = code[i];
+      const fontSize = 38 + Math.floor(Math.random() * 7); // 38~44px
+
+      ctx.font = `${fontSize}px Arial, sans-serif`;
+      ctx.fillStyle = '#000';
+      ctx.textBaseline = 'middle';
+
+      const x = startX + i * 40 + (Math.random() * 8 - 4);
+      const y = baseY + (Math.random() * 10 - 5);
+
+      ctx.save();
+      ctx.translate(x, y);
+      ctx.scale(0.83, 1.5);
+      ctx.fillText(char, 0, 0);
+      ctx.restore();
+    }
+
+    currentCode = code;
+  }
+
+  function generateFromInput() {
+    const input = document.getElementById('userInput').value.trim().toUpperCase();
+    const msgEl = document.getElementById('msg');
+
+    if (input.length !== 6) {
+      msgEl.textContent = '请输入恰好6个字符（数字或字母）';
+      return;
+    }
+
+    for (let char of input) {
+      if (!VALID_CHARS.includes(char)) {
+        msgEl.textContent = '仅允许数字 0-9 和字母 A-Z';
+        return;
+      }
+    }
+
+    msgEl.textContent = '';
+    draw(input);
+  }
+
+  function generateRandom() {
+    const code = generateRandomCode();
+    document.getElementById('userInput').value = code;
+    document.getElementById('msg').textContent = '';
+    draw(code);
+  }
+
+  function downloadCaptcha() {
+    const canvas = document.getElementById('captchaCanvas');
+    const link = document.createElement('a');
+    link.download = `captcha-${currentCode || 'image'}.png`;
+    link.href = canvas.toDataURL('image/png');
+    link.click();
+  }
+
+  // 初始化
+  window.onload = () => {
+    generateRandom(); // 启动时随机生成一个
+  };
+
+  // 点击验证码图片 → 随机生成
+  document.getElementById('captchaCanvas').addEventListener('click', generateRandom);
+</script>
+
+</body>
+</html>
