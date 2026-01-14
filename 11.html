@@ -1,0 +1,207 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>按厘米+DPI生成印章</title>
+  <style>
+    body {
+      font-family: "Microsoft YaHei", sans-serif;
+      padding: 20px;
+      background: #f9f6f0;
+    }
+    .controls {
+      margin-bottom: 20px;
+      display: flex;
+      gap: 12px;
+      align-items: center;
+    }
+    input, button {
+      padding: 6px 10px;
+      font-size: 14px;
+    }
+    canvas {
+      border: 1px solid #ccc;
+      background: #fdfaf5;
+      box-shadow: 0 2px 6px rgba(0,0,0,0.1);
+    }
+    .info {
+      margin-top: 10px;
+      color: #666;
+      font-size: 13px;
+    }
+  </style>
+</head>
+<body>
+
+<h2>印章生成器（按物理尺寸）</h2>
+
+<div class="controls">
+  <label>印章直径（厘米）：<input type="number" id="widthCm" value="4" min="1" max="10" step="0.1"></label>
+  <label>分辨率（DPI）：<input type="number" id="dpi" value="300" min="72" max="1200" step="1"></label>
+  <button onclick="generateSeal()">生成印章</button>
+  <button onclick="downloadSeal()">下载 PNG</button>
+</div>
+
+<canvas id="sealCanvas"></canvas>
+<div class="info" id="info"></div>
+
+<script>
+// ========== 1. cm → px 转换函数 ==========
+function cmToPx(cm, dpi) {
+  return Math.round((cm / 2.54) * dpi);
+}
+
+// ========== 2. 高清 Canvas 初始化 ==========
+function setupCanvas(canvas, logicalSizePx) {
+  // 我们直接使用逻辑像素作为绘制尺寸（因为已按 DPI 计算）
+  canvas.width = logicalSizePx;
+  canvas.height = logicalSizePx;
+  canvas.style.width = `${logicalSizePx}px`;
+  canvas.style.height = `${logicalSizePx}px`;
+
+  const ctx = canvas.getContext('2d');
+  // 禁用图像平滑，让文字/线条更锐利
+  ctx.imageSmoothingEnabled = false;
+  return ctx;
+}
+
+// ========== 3. 五角星绘制（修正版）==========
+function drawStar(ctx, radius, color = '#e60000') {
+  ctx.save();
+  ctx.beginPath();
+  const outerRadius = radius;
+  const innerRadius = radius * 0.382;
+  let angle = -Math.PI / 2;
+  const delta = (2 * Math.PI) / 10;
+
+  ctx.moveTo(
+    Math.cos(angle) * outerRadius,
+    Math.sin(angle) * outerRadius
+  );
+
+  for (let i = 1; i < 10; i++) {
+    angle += delta;
+    const r = i % 2 === 0 ? outerRadius : innerRadius;
+    ctx.lineTo(
+      Math.cos(angle) * r,
+      Math.sin(angle) * r
+    );
+  }
+
+  ctx.closePath();
+  ctx.fillStyle = color;
+  ctx.fill();
+  ctx.restore();
+}
+
+// ========== 4. 弧形文字 ==========
+function drawArcText(ctx, text, radius, startAngle, endAngle, fontSize = 20) {
+  if (!text) return;
+  ctx.save();
+  ctx.font = `bold ${fontSize}px "FangSong", "SimSun", sans-serif`;
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+
+  const totalAngle = endAngle - startAngle;
+  for (let i = 0; i < text.length; i++) {
+    const char = text[i];
+    const angle = startAngle + (i / (text.length - 1 || 1)) * totalAngle;
+    const x = Math.cos(angle) * radius;
+    const y = Math.sin(angle) * radius;
+
+    ctx.save();
+    ctx.translate(x, y);
+    ctx.rotate(angle + Math.PI / 2);
+    ctx.fillText(char, 0, 0);
+    ctx.restore();
+  }
+  ctx.restore();
+}
+
+// ========== 5. 印章生成主函数 ==========
+function useSealGenerator(config, ctx) {
+  const { size, company, sealName, color } = config;
+  const centerX = size / 2;
+  const centerY = size / 2;
+  const outerRadius = size * 0.45;
+  const innerRadius = size * 0.25;
+
+  // 清空背景
+  ctx.fillStyle = '#fdfaf5';
+  ctx.fillRect(0, 0, size, size);
+
+  ctx.save();
+  ctx.translate(centerX, centerY);
+
+  // 外圈
+  ctx.strokeStyle = color;
+  ctx.lineWidth = 4;
+  ctx.beginPath();
+  ctx.arc(0, 0, outerRadius, 0, Math.PI * 2);
+  ctx.stroke();
+
+  // 内圈
+  ctx.lineWidth = 1;
+  ctx.beginPath();
+  ctx.arc(0, 0, innerRadius, 0, Math.PI * 2);
+  ctx.stroke();
+
+  // 五角星
+  drawStar(ctx, innerRadius * 0.7, color);
+
+  // 文字
+  drawArcText(ctx, company, outerRadius - 12, Math.PI * 0.9, Math.PI * 1.1, 20);
+  drawArcText(ctx, sealName, innerRadius + 10, Math.PI * 1.9, Math.PI * 2.1, 18);
+
+  ctx.restore();
+}
+
+// ========== 6. 生成印章 ==========
+let currentSizePx = 0;
+
+function generateSeal() {
+  const widthCm = parseFloat(document.getElementById('widthCm').value) || 4;
+  const dpi = parseInt(document.getElementById('dpi').value) || 300;
+
+  // 计算像素尺寸
+  const sizePx = cmToPx(widthCm, dpi);
+  currentSizePx = sizePx;
+
+  const canvas = document.getElementById('sealCanvas');
+  const ctx = setupCanvas(canvas, sizePx);
+
+  // 更新信息
+  document.getElementById('info').textContent = 
+    `印章尺寸：${widthCm} cm × ${widthCm} cm | 分辨率：${dpi} DPI | 输出像素：${sizePx} × ${sizePx}`;
+
+  // 生成印章
+  useSealGenerator({
+    size: sizePx,
+    company: '阿里巴巴集团控股有限公司',
+    sealName: '电子合同专用章',
+    color: '#e60000'
+  }, ctx);
+}
+
+// ========== 7. 下载 PNG ==========
+function downloadSeal() {
+  if (currentSizePx <= 0) {
+    alert('请先生成印章！');
+    return;
+  }
+  const canvas = document.getElementById('sealCanvas');
+  const link = document.createElement('a');
+  link.download = `seal_${currentSizePx}px.png`;
+  link.href = canvas.toDataURL('image/png', 1.0);
+  link.click();
+}
+
+// ========== 初始化 ==========
+window.onload = () => {
+  generateSeal(); // 页面加载时自动生成
+};
+</script>
+
+</body>
+</html>

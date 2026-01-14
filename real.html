@@ -1,0 +1,99 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>Canvas高清电子印章(含防伪码)</title>
+</head>
+<body>
+    <canvas id="seal" width="600" height="600" style="width:300px;height:300px;"></canvas>
+
+    <script>
+        const canvas = document.getElementById('seal');
+        const ctx = canvas.getContext('2d');
+        // 高清抗锯齿+精准绘制设置（必加）
+        ctx.translate(0.5, 0.5);
+        ctx.imageSmoothingEnabled = true;
+        ctx.lineCap = 'round';
+        ctx.lineJoin = 'round';
+        // 印章标准红色
+        const sealColor = '#DC143C';
+
+        // 印章核心参数（不变）
+        const centerX = 300;
+        const centerY = 300;
+        const outerRadius = 250;
+        const lineWidth = 8;
+        const starRadius = 40;
+        const textRadius = 200;
+
+        // 1.绘制外圆边框
+        ctx.beginPath();
+        ctx.arc(centerX, centerY, outerRadius, 0, Math.PI * 2);
+        ctx.strokeStyle = sealColor;
+        ctx.lineWidth = lineWidth;
+        ctx.stroke();
+        ctx.closePath();
+
+        // 2.绘制中心五角星
+        ctx.beginPath();
+        ctx.fillStyle = sealColor;
+        for (let i = 0; i < 5; i++) {
+            ctx.lineTo(
+                centerX + starRadius * Math.cos((18 + i * 72) / 180 * Math.PI),
+                centerY - starRadius * Math.sin((18 + i * 72) / 180 * Math.PI)
+            );
+            ctx.lineTo(
+                centerX + starRadius * 0.38 * Math.cos((54 + i * 72) / 180 * Math.PI),
+                centerY - starRadius * 0.38 * Math.sin((54 + i * 72) / 180 * Math.PI)
+            );
+        }
+        ctx.closePath();
+        ctx.fill();
+
+        // 3.绘制环形单位文字
+        const sealText = '某某科技有限公司 公章'; // 替换你的单位名称
+        ctx.beginPath();
+        ctx.fillStyle = sealColor;
+        ctx.font = 'bold 28px SimSun, 宋体'; // 公章文字用宋体
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        const textLen = sealText.length;
+        const angleStep = (2 * Math.PI) / textLen;
+        const startAngle = -Math.PI / 2;
+        for (let i = 0; i < textLen; i++) {
+            const angle = startAngle + i * angleStep;
+            ctx.save();
+            ctx.translate(centerX + textRadius * Math.cos(angle), centerY + textRadius * Math.sin(angle));
+            ctx.rotate(angle + Math.PI / 2);
+            ctx.fillText(sealText[i], 0, 0);
+            ctx.restore();
+        }
+        ctx.closePath();
+
+        // // 4.绘制【防伪码】- 五角星下方（推荐，重点！）
+        // ctx.beginPath();
+        // const antiFakeCode = "9144010678901234"; // 替换你的防伪码/备案号
+        // ctx.fillStyle = sealColor;
+        // ctx.font = 'bold 14px 等线, sans-serif'; // 防伪码专用：等线粗体14px
+        // ctx.textAlign = 'center';
+        // ctx.textBaseline = 'middle';
+        // ctx.fillText(antiFakeCode, 300, 360); // 精准坐标
+        ctx.closePath();
+
+// ========== 第六步：绘制【防伪码/防伪数字】- 印章底部内侧（备用，长防伪码用） ==========
+ctx.beginPath();
+const antiFakeCode = "备案号：91440106MA9Y2X0X12"; // 替换成你的长防伪码/备案号
+ctx.fillStyle = sealColor;
+ctx.font = 'bold 14px 等线, sans-serif';
+ctx.textAlign = 'center';
+ctx.textBaseline = 'middle';
+ctx.fillText(antiFakeCode, 300, 420); // 精准坐标：x=300，y=420
+ctx.closePath();
+
+
+        // 导出透明底高清印章图片（可选，需要就保留）
+        const imgUrl = canvas.toDataURL('image/png');
+        console.log(imgUrl);
+    </script>
+</body>
+</html>

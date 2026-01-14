@@ -1,0 +1,40 @@
+<!DOCTYPE html>
+<html>
+<head><meta charset="utf-8"><title>5. 整体褪色</title></head>
+<body style="background:#f5f5f5; padding:20px; font-family:sans-serif">
+<h3>整体褪色：油墨氧化，颜色变淡发棕</h3>
+<canvas id="canvas" width="400" height="400" style="border:1px solid #ccc; background:white"></canvas>
+<script>
+const canvas = document.getElementById('canvas');
+const ctx = canvas.getContext('2d');
+const cx = 200, cy = 200, r = 150;
+
+// 使用褪色红：偏棕、低饱和、低亮度
+const fadedRed = '#A03030'; // 褪色后的红
+
+ctx.strokeStyle = fadedRed;
+ctx.fillStyle = fadedRed;
+ctx.lineWidth = 2;
+ctx.beginPath(); ctx.arc(cx, cy, r, 0, Math.PI*2); ctx.stroke();
+ctx.lineWidth = 1;
+ctx.beginPath(); ctx.arc(cx, cy, r*0.55, 0, Math.PI*2); ctx.stroke();
+ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+ctx.font = `bold ${r*0.16}px "FangSong", "STFangsong", serif`;
+ctx.fillText('某某科技有限公司', cx, cy - r*0.15);
+
+ctx.save();
+ctx.translate(cx, cy + r*0.2);
+ctx.beginPath();
+for (let i=0; i<5; i++) {
+  let a = Math.PI/2 + i*Math.PI*2/5;
+  let x = Math.cos(a)*r*0.12, y = -Math.sin(a)*r*0.12;
+  if(i===0) ctx.moveTo(x,y);
+  else ctx.lineTo(x,y);
+  a += Math.PI/5;
+  x = Math.cos(a)*r*0.12*0.4; y = -Math.sin(a)*r*0.12*0.4;
+  ctx.lineTo(x,y);
+}
+ctx.closePath(); ctx.fill(); ctx.restore();
+</script>
+</body>
+</html>

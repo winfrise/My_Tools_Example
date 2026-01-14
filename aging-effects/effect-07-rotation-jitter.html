@@ -1,0 +1,25 @@
+<!DOCTYPE html>
+<html>
+<head><meta charset="utf-8"><title>7. 旋转偏移</title></head>
+<body style="background:#f5f5f5; padding:20px; font-family:sans-serif">
+<h3>旋转偏移：盖章手抖，整体轻微歪斜</h3>
+<canvas id="canvas" width="400" height="400" style="border:1px solid #ccc; background:white"></canvas>
+<script src="./js/common.js"></script>
+<script>
+
+const canvas = document.getElementById('canvas');
+const ctx = canvas.getContext('2d');
+const cx = 200, cy = 200, r = 150;
+
+// 随机旋转 ±3 度（明显可见）
+const angle = (Math.random() - 0.5) * 0.1; // ≈ ±2.86°
+
+ctx.save();
+ctx.translate(cx, cy);
+ctx.rotate(angle);
+ctx.translate(-cx, -cy);
+drawFreshSeal(ctx, cx, cy, r);
+ctx.restore();
+</script>
+</body>
+</html>

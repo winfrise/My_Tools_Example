@@ -1,0 +1,42 @@
+<!DOCTYPE html>
+<html>
+<head><meta charset="utf-8"><title>老化效果 2：边缘磨损</title></head>
+<body>
+<canvas id="canvas" width="400" height="400" style="border:1px solid #ccc"></canvas>
+
+<script src="./js/common.js"></script>
+<script>
+
+const canvas = document.getElementById('canvas');
+const ctx = canvas.getContext('2d');
+const cx = canvas.width / 2, cy = canvas.height / 2, radius = 150;
+
+// 自定义绘制带边缘淡化的圆环
+function drawFadedCircle(ctx, x, y, r, lineWidth) {
+  const gradient = ctx.createRadialGradient(x, y, r - lineWidth, x, y, r + lineWidth);
+  gradient.addColorStop(0, '#e60000');
+  gradient.addColorStop(0.7, '#e60000');
+  gradient.addColorStop(1, 'transparent');
+  
+  ctx.strokeStyle = gradient;
+  ctx.lineWidth = lineWidth * 2;
+  ctx.beginPath();
+  ctx.arc(x, y, r, 0, Math.PI * 2);
+  ctx.stroke();
+}
+
+// 外环
+drawFadedCircle(ctx, cx, cy, radius, 2);
+// 内环
+drawFadedCircle(ctx, cx, cy, radius * 0.55, 1);
+
+// 文字和五角星保持清晰（或也加淡化）
+ctx.textAlign = 'center';
+ctx.textBaseline = 'middle';
+ctx.font = `bold ${radius * 0.16}px "FangSong", "STFangsong", serif`;
+ctx.fillStyle = '#e60000';
+ctx.fillText('某某科技有限公司', cx, cy - radius * 0.15);
+drawStar(ctx, cx, cy + radius * 0.2, radius * 0.12, '#e60000');
+</script>
+</body>
+</html>
