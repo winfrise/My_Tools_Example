@@ -1,0 +1,72 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <title>Canvas 双线回纹 细腻空心印章圆 (精致篆刻)</title>
+  <style>canvas { border: 1px solid #eee; background: #fff; }</style>
+</head>
+<body>
+<canvas id="canvas" width="400" height="400"></canvas>
+<script>
+const canvas = document.getElementById('canvas');
+const ctx = canvas.getContext('2d');
+const centerX = 200, centerY = 200;
+const outRadius = 150;  // 外环半径
+const inRadius = 138;   // 内环半径
+const lineWidth = 4;    // 双线宽度，精致细腻
+const roughness = 1.3;  // 双线同步细腻毛边
+const sealColor = '#c02f23';
+const density = 0.012;
+
+// ✅ 绘制外环细腻毛边路径
+ctx.beginPath();
+for (let angle = 0; angle < Math.PI * 2; angle += density) {
+  const randomOffset = (Math.random() - 0.5) * roughness * 0.8;
+  const r = outRadius + randomOffset;
+  const x = centerX + Math.cos(angle) * r;
+  const y = centerY + Math.sin(angle) * r;
+  angle ===0 ? ctx.moveTo(x,y) : ctx.lineTo(x,y);
+}
+ctx.closePath();
+
+// ✅ 绘制内环细腻毛边路径
+ctx.beginPath();
+for (let angle = 0; angle < Math.PI * 2; angle += density) {
+  const randomOffset = (Math.random() - 0.5) * roughness * 0.8;
+  const r = inRadius + randomOffset;
+  const x = centerX + Math.cos(angle) * r;
+  const y = centerY + Math.sin(angle) * r;
+  angle ===0 ? ctx.moveTo(x,y) : ctx.lineTo(x,y);
+}
+ctx.closePath();
+
+// 双线扎实绘制
+ctx.lineWidth = lineWidth;
+ctx.strokeStyle = sealColor;
+ctx.lineCap = 'round';
+ctx.stroke();
+
+// 篆刻纹理叠加
+ctx.globalCompositeOperation = 'soft-light';
+ctx.globalAlpha = 0.75;
+ctx.strokeStyle = createUltraDelicateTexture();
+ctx.stroke();
+ctx.globalAlpha =1;
+ctx.globalCompositeOperation = 'source-over';
+
+// 复用超细纹理函数
+function createUltraDelicateTexture() {
+  const texCanvas = document.createElement('canvas');
+  texCanvas.width=12;texCanvas.height=12;
+  const texCtx = texCanvas.getContext('2d');
+  texCtx.fillStyle='rgba(0,0,0,0)';texCtx.fillRect(0,0,12,12);
+  for(let i=0;i<35;i++){
+    const x=Math.random()*12,y=Math.random()*12;
+    texCtx.fillStyle=Math.random()>0.75?'#a21f16':sealColor;
+    texCtx.fillRect(x,y,0.7,0.7);
+  }
+  return ctx.createPattern(texCanvas, 'repeat');
+}
+</script>
+</body>
+</html>

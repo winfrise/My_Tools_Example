@@ -1,0 +1,84 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <title>Canvas 细腻空心毛边印章圆 (最贴合参考图)</title>
+  <style>canvas { border: 1px solid #eee; background: #fff; }</style>
+</head>
+<body>
+<canvas id="canvas" width="400" height="400"></canvas>
+
+<script>
+const canvas = document.getElementById('canvas');
+const ctx = canvas.getContext('2d');
+// ========== 核心可调参数【全部微调至细腻最优值，也可按需小幅度修改】 ==========
+const centerX = 200, centerY = 200; // 圆心
+const radius = 150;                 // 空心圆半径
+const lineWidth = 9;                // 边框宽度【细腻最优值9】扎实不虚+不臃肿
+const roughness = 2.2;              // 毛边细腻度核心值【重中之重！】推荐2.0~2.5，越小越细腻
+const sealColor = '#c12f22';        // 精准印章正红，浓郁不艳俗，和参考图一致
+const density = 0.015;              // 弧度步长，越小路径越顺滑细腻
+
+// ========== ✅ 核心1：绘制【极致细腻毛边】空心圆形路径 (重构算法，最关键) ==========
+ctx.beginPath();
+for (let angle = 0; angle < Math.PI * 2; angle += density) {
+  // 双层随机偏移：实现【细腻微起伏+随机细碎飞边】 模拟真实印章毛边核心公式
+  // 第一层：基础微偏移，让边缘有柔和的弧度起伏，无大凹凸
+  const baseOffset = (Math.random() - 0.5) * roughness;
+  // 第二层：极低概率的细碎飞边，模拟印章的自然毛边，细腻不杂乱
+  const tinyFlyEdge = Math.random() > 0.92 ? (Math.random() - 0.5) * roughness * 1.8 : 0;
+  const randomOffset = baseOffset + tinyFlyEdge;
+  
+  const r = radius + randomOffset;
+  const x = centerX + Math.cos(angle) * r;
+  const y = centerY + Math.sin(angle) * r;
+  angle === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y);
+}
+ctx.closePath();
+
+// ========== ✅ 核心2：绘制扎实边框 解决虚化+保证细腻度 ==========
+ctx.lineWidth = lineWidth;
+ctx.strokeStyle = sealColor;
+ctx.lineCap = 'round';    // 线条端点圆润，无生硬棱角
+ctx.lineJoin = 'round';   // 路径衔接顺滑，无锯齿
+ctx.stroke();
+
+// ========== ✅ 核心3：叠加【细腻柔化印泥纹理】 无粗颗粒+高级斑驳感 ==========
+ctx.globalCompositeOperation = 'soft-light'; // 替换成柔光叠加，纹理融入边框，不突兀【细腻关键】
+ctx.strokeStyle = createDelicateTexture();   // 生成细腻纹理，无粗颗粒
+ctx.stroke();
+
+// 恢复画布默认模式
+ctx.globalCompositeOperation = 'source-over';
+
+// ========== ✅ 辅助函数：生成【极致细腻】印章纹理 (无粗颗粒，纯细腻质感) ==========
+function createDelicateTexture() {
+  const texCanvas = document.createElement('canvas');
+  texCanvas.width = 16;  // 缩小纹理画布，颗粒更细
+  texCanvas.height = 16;
+  const texCtx = texCanvas.getContext('2d');
+  
+  texCtx.fillStyle = 'rgba(0,0,0,0)';
+  texCtx.fillRect(0, 0, 16, 16);
+
+  // 绘制【超细颗粒+淡深浅红】印泥纹理，模拟真实盖印的细腻斑驳
+  for (let i = 0; i < 45; i++) {
+    const x = Math.random() * 16;
+    const y = Math.random() * 16;
+    const size = Math.random() * 1.1 + 0.2; // 颗粒极小，细腻核心
+    // 两种细腻同色系红，无大色差，过渡自然
+    texCtx.fillStyle = Math.random() > 0.7 ? '#a01d14' : sealColor;
+    texCtx.fillRect(x, y, size, size);
+  }
+  // 再叠加一层极细的点状纹理，增强印泥质感
+  for (let i = 0; i < 25; i++) {
+    const x = Math.random() * 16;
+    const y = Math.random() * 16;
+    texCtx.fillStyle = Math.random()>0.8 ? '#881810' : sealColor;
+    texCtx.fillRect(x, y, 0.5, 0.5);
+  }
+  return ctx.createPattern(texCanvas, 'repeat');
+}
+</script>
+</body>
+</html>

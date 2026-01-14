@@ -1,0 +1,68 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <title>Canvas 篆刻拓印 磨砂空心印章圆 (复古国风)</title>
+  <style>canvas { border: 1px solid #eee; background: #fff; }</style>
+</head>
+<body>
+<canvas id="canvas" width="400" height="400"></canvas>
+<script>
+const canvas = document.getElementById('canvas');
+const ctx = canvas.getContext('2d');
+const centerX = 200, centerY = 200;
+const radius = 150;
+const lineWidth = 8;
+const roughness = 1.4; // 磨砂微毛边，极致细腻
+const sealColor = '#b52c20'; // 复古暗红，拓印专属色
+const density = 0.012;
+
+// 细腻磨砂毛边路径
+ctx.beginPath();
+for (let angle = 0; angle < Math.PI * 2; angle += density) {
+  const randomOffset = (Math.random() - 0.5) * roughness * 0.8;
+  const r = radius + randomOffset;
+  const x = centerX + Math.cos(angle) * r;
+  const y = centerY + Math.sin(angle) * r;
+  angle ===0 ? ctx.moveTo(x,y) : ctx.lineTo(x,y);
+}
+ctx.closePath();
+
+// ✅ 核心：拓印磨砂质感 - 先画实色边框，再叠加石纹磨砂纹理
+ctx.lineWidth = lineWidth;
+ctx.strokeStyle = sealColor;
+ctx.lineCap = 'round';
+ctx.stroke();
+
+// 拓印纹理核心：磨砂颗粒+深浅不均，无虚化
+ctx.globalCompositeOperation = 'multiply';
+ctx.globalAlpha = 0.75;
+ctx.strokeStyle = createCarveTexture();
+ctx.stroke();
+ctx.globalAlpha =1;
+ctx.globalCompositeOperation = 'source-over';
+
+// 篆刻拓印纹理函数
+function createCarveTexture() {
+  const texCanvas = document.createElement('canvas');
+  texCanvas.width=10;texCanvas.height=10;
+  const texCtx = texCanvas.getContext('2d');
+  texCtx.fillStyle='rgba(0,0,0,0)';texCtx.fillRect(0,0,10,10);
+  // 磨砂细颗粒，模拟石纹
+  for(let i=0;i<40;i++){
+    const x=Math.random()*10,y=Math.random()*10;
+    const size = Math.random()*0.7+0.1;
+    texCtx.fillStyle = Math.random()>0.7 ? '#881c14' : sealColor;
+    texCtx.fillRect(x,y,size,size);
+  }
+  // 石纹细纹，增强拓印感
+  for(let i=0;i<10;i++){
+    const x=Math.random()*10,y=Math.random()*10;
+    texCtx.fillStyle = '#992016';
+    texCtx.fillRect(x,y,0.2,Math.random()*3);
+  }
+  return ctx.createPattern(texCanvas, 'repeat');
+}
+</script>
+</body>
+</html>

@@ -1,0 +1,61 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <title>Canvas 极简柔边 细腻空心印章圆 (最干净)</title>
+  <style>canvas { border: 1px solid #eee; background: #fff; }</style>
+</head>
+<body>
+<canvas id="canvas" width="400" height="400"></canvas>
+<script>
+const canvas = document.getElementById('canvas');
+const ctx = canvas.getContext('2d');
+const centerX = 200, centerY = 200;
+const radius = 150;
+const lineWidth = 8;
+const roughness = 1.0; // ✅ 毛边极淡，几乎隐形，柔边核心值
+const sealColor = '#c12f22';
+const density = 0.01; // 超密步长，路径无限顺滑
+
+// 极致顺滑柔边路径
+ctx.beginPath();
+for (let angle = 0; angle < Math.PI * 2; angle += density) {
+  const randomOffset = (Math.random() - 0.5) * roughness * 0.6;
+  const r = radius + randomOffset;
+  const x = centerX + Math.cos(angle) * r;
+  const y = centerY + Math.sin(angle) * r;
+  angle ===0 ? ctx.moveTo(x,y) : ctx.lineTo(x,y);
+}
+ctx.closePath();
+
+// 温润扎实边框，无任何锯齿
+ctx.lineWidth = lineWidth;
+ctx.strokeStyle = sealColor;
+ctx.lineCap = 'round';
+ctx.lineJoin = 'round';
+ctx.stroke();
+
+// ✅ 极淡纹理，只增质感不增颗粒
+ctx.globalCompositeOperation = 'soft-light';
+ctx.globalAlpha = 0.65;
+ctx.strokeStyle = createSmoothTexture();
+ctx.stroke();
+ctx.globalAlpha =1;
+ctx.globalCompositeOperation = 'source-over';
+
+// 极简柔化纹理函数
+function createSmoothTexture() {
+  const texCanvas = document.createElement('canvas');
+  texCanvas.width=15;texCanvas.height=15;
+  const texCtx = texCanvas.getContext('2d');
+  texCtx.fillStyle='rgba(0,0,0,0)';texCtx.fillRect(0,0,15,15);
+  for(let i=0;i<25;i++){
+    const x=Math.random()*15,y=Math.random()*15;
+    texCtx.fillStyle = sealColor;
+    texCtx.fillRect(x,y,0.5,0.5);
+  }
+  return ctx.createPattern(texCanvas, 'repeat');
+}
+</script>
+</body>
+</html>

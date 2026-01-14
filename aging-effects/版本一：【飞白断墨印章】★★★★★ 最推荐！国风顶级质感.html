@@ -1,0 +1,74 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <title>Canvas 飞白断墨 细腻空心印章圆 (国风首选)</title>
+  <style>canvas { border: 1px solid #eee; background: #fff; }</style>
+</head>
+<body>
+<canvas id="canvas" width="400" height="400"></canvas>
+<script>
+const canvas = document.getElementById('canvas');
+const ctx = canvas.getContext('2d');
+const centerX = 200, centerY = 200;
+const radius = 150;
+const lineWidth = 8;    // 细腻边框宽度
+const roughness = 1.5;  // 极致细腻毛边，无毛刺
+const sealColor = '#c02f23'; // 印章正红
+const density = 0.012;
+
+// ✅ 核心：飞白断墨+细腻毛边 路径绘制
+ctx.beginPath();
+let drawFlag = true; // 控制断墨的开关
+for (let angle = 0; angle < Math.PI * 2; angle += density) {
+  // 细腻毛边三层微偏移（和你最满意的版本一致）
+  const softOffset = (Math.random() - 0.5) * roughness * 0.9;
+  const tinyJitter = Math.random() * roughness * 0.4 - (roughness * 0.2);
+  const flyEdge = Math.random() > 0.96 ? (Math.random() - 0.5) * roughness : 0;
+  const randomOffset = softOffset + tinyJitter + flyEdge;
+  const r = radius + randomOffset;
+  const x = centerX + Math.cos(angle) * r;
+  const y = centerY + Math.sin(angle) * r;
+
+  // ✅ 飞白断墨核心逻辑：极低概率随机断开/续上，模拟印泥不足
+  const randomBreak = Math.random();
+  if(randomBreak > 0.985) drawFlag = !drawFlag;
+  if(drawFlag) {
+    angle === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y);
+  } else {
+    ctx.moveTo(x, y); // 断开时只移动不绘制，形成留白
+  }
+}
+ctx.closePath();
+
+// 绘制扎实边框
+ctx.lineWidth = lineWidth;
+ctx.strokeStyle = sealColor;
+ctx.lineCap = 'round';
+ctx.lineJoin = 'round';
+ctx.stroke();
+
+// 叠加超细印泥纹理
+ctx.globalCompositeOperation = 'soft-light';
+ctx.globalAlpha = 0.8;
+ctx.strokeStyle = createUltraDelicateTexture();
+ctx.stroke();
+ctx.globalAlpha = 1.0;
+ctx.globalCompositeOperation = 'source-over';
+
+// 超细纹理函数（和极致细腻版一致）
+function createUltraDelicateTexture() {
+  const texCanvas = document.createElement('canvas');
+  texCanvas.width =12;texCanvas.height=12;
+  const texCtx = texCanvas.getContext('2d');
+  texCtx.fillStyle='rgba(0,0,0,0)';texCtx.fillRect(0,0,12,12);
+  for(let i=0;i<35;i++){
+    const x=Math.random()*12,y=Math.random()*12;
+    texCtx.fillStyle=Math.random()>0.75?'#a21f16':sealColor;
+    texCtx.fillRect(x,y,Math.random()*0.8+0.1,Math.random()*0.8+0.1);
+  }
+  return ctx.createPattern(texCanvas, 'repeat');
+}
+</script>
+</body>
+</html>

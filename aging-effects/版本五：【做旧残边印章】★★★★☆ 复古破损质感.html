@@ -1,0 +1,65 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <title>Canvas 做旧残边 细腻空心印章圆 (复古残章)</title>
+  <style>canvas { border: 1px solid #eee; background: #fff; }</style>
+</head>
+<body>
+<canvas id="canvas" width="400" height="400"></canvas>
+<script>
+const canvas = document.getElementById('canvas');
+const ctx = canvas.getContext('2d');
+const centerX = 200, centerY = 200;
+const radius = 150;
+const lineWidth = 8;
+const roughness = 1.5;
+const sealColor = '#a8291e'; // 做旧暗红，老印章专属色
+const density = 0.012;
+
+// 残边+细腻毛边路径
+ctx.beginPath();
+let lastX = 0, lastY =0;
+for (let angle = 0; angle < Math.PI * 2; angle += density) {
+  // 细腻毛边偏移
+  const randomOffset = (Math.random() - 0.5) * roughness * 0.9;
+  // ✅ 残边核心：极低概率的小缺口偏移
+  const brokenOffset = Math.random()>0.99 ? (Math.random()-0.5)*roughness*3 : 0;
+  const r = radius + randomOffset + brokenOffset;
+  const x = centerX + Math.cos(angle) * r;
+  const y = centerY + Math.sin(angle) * r;
+  angle ===0 ? (ctx.moveTo(x,y),lastX=x,lastY=y) : ctx.lineTo(x,y);
+}
+ctx.closePath();
+
+// 做旧实色边框
+ctx.lineWidth = lineWidth;
+ctx.strokeStyle = sealColor;
+ctx.lineCap = 'round';
+ctx.stroke();
+
+// 做旧纹理叠加
+ctx.globalCompositeOperation = 'overlay';
+ctx.globalAlpha = 0.7;
+ctx.strokeStyle = createOldTexture();
+ctx.stroke();
+ctx.globalAlpha =1;
+ctx.globalCompositeOperation = 'source-over';
+
+// 做旧纹理函数
+function createOldTexture() {
+  const texCanvas = document.createElement('canvas');
+  texCanvas.width=12;texCanvas.height=12;
+  const texCtx = texCanvas.getContext('2d');
+  texCtx.fillStyle='rgba(0,0,0,0)';texCtx.fillRect(0,0,12,12);
+  // 做旧浅斑
+  for(let i=0;i<30;i++){
+    const x=Math.random()*12,y=Math.random()*12;
+    texCtx.fillStyle = Math.random()>0.7 ? '#7c1f17' : sealColor;
+    texCtx.fillRect(x,y,0.6,0.6);
+  }
+  return ctx.createPattern(texCanvas, 'repeat');
+}
+</script>
+</body>
+</html>
