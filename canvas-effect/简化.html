@@ -124,7 +124,7 @@
       doubleLine: {
         outRadius: 150,
         inRadius: 138,
-        lineWidth: 4,
+        lineWidth: 8,
         roughness: 1.3,
         sealColor: '#c02f23',
         drawPath: drawDoubleLinePath,
@@ -149,6 +149,7 @@
       }
       ctx.closePath();
     }
+
 
     // 飞白断墨路径
     function drawFlyWhitePath(config) {
@@ -315,7 +316,7 @@
       for (let i = 0; i < 30; i++) {
         const x = Math.random() * 12, y = Math.random() * 12;
         texCtx.fillStyle = Math.random() > 0.7 ? '#7c1f17' : config.sealColor;
-        texCtx.fillRect(x, y, 0.6, 0.6);
+        texCtx.fillRect(x, y, 1, 1);
       }
       return ctx.createPattern(texCanvas, 'repeat');
     }

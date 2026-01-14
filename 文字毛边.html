@@ -1,0 +1,90 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <title>Canvas 双线印章+毛边超明显飞白文字 最终完美版</title>
+  <style>canvas { border: 1px solid #eee; background: #fff; }</style>
+</head>
+<body>
+<canvas id="canvas" width="400" height="400"></canvas>
+
+<script>
+const canvas = document.getElementById('canvas');
+const ctx = canvas.getContext('2d');
+const centerX = 200, centerY = 200;
+const outRadius = 150;
+const inRadius = 138;
+const lineWidth = 10;
+// ✅ 印章毛边【超级明显】匹配文字，数值拉满，无毛刺
+const sealRoughness = 0.8;  
+const sealColor = '#c02f23';// 纯正印章红，颜色浓郁不褪色
+const text = "福";
+const textFontSize = 90;
+// ✅ ✅ ✅ 文字毛边【核心超明显值】这个数值是重点，毛边肉眼一眼可见
+const textRoughness = 8.0;
+
+// ========== 第一步：绘制 毛边超明显的双线回纹印章 ==========
+function drawDoubleCircleSeal(){
+  ctx.beginPath();
+  for (let angle = 0; angle < Math.PI * 2; angle += 0.012) {
+    // ✅ 印章偏移量x1.8倍，毛边厚重明显，同步文字质感
+    const randomOffset = (Math.random() - 0.5) * sealRoughness * 1.8;
+    const r = outRadius + randomOffset;
+    const x = centerX + Math.cos(angle) * r;
+    const y = centerY + Math.sin(angle) * r;
+    angle === 0 ? ctx.moveTo(x,y) : ctx.lineTo(x,y);
+  }
+  ctx.closePath();
+  ctx.beginPath();
+  for (let angle = 0; angle < Math.PI * 2; angle += 0.012) {
+    const randomOffset = (Math.random() - 0.5) * sealRoughness * 1.8;
+    const r = inRadius + randomOffset;
+    const x = centerX + Math.cos(angle) * r;
+    const y = centerY + Math.sin(angle) * r;
+    angle === 0 ? ctx.moveTo(x,y) : ctx.lineTo(x,y);
+  }
+  ctx.closePath();
+  ctx.lineWidth = lineWidth;
+  ctx.strokeStyle = sealColor;
+  ctx.lineCap = 'round';
+  ctx.lineJoin = 'round';
+  ctx.stroke();
+}
+
+// ========== 第二步：绘制 ✅毛边超级明显+飞白浓郁 的核心文字【重中之重】 ==========
+function drawFadeRoughText(ctx, text, cx, cy, fontSize, roughness, color) {
+  ctx.save();
+  ctx.font = `bold ${fontSize}px 宋体, 楷体, 黑体`;
+  const textWidth = ctx.measureText(text).width;
+  const x = cx - textWidth / 2;
+  const y = cy + 25;
+  ctx.fillStyle = color;
+  let alphaRate = 1;
+  let isFade = false;
+  const fadeRate = 0.08; // ✅飞白渐变更快，留白更明显
+  // ✅✅✅ 核心修改1：偏移量计算调整，毛边幅度直接翻倍，肉眼可见，毛边立体感拉满
+  const offsetStep = roughness / 1.2; 
+  // ✅✅✅ 核心修改2：叠加层数加到18层，毛边厚重不稀薄，存在感十足
+  for (let n = 0; n < 50; n++) {
+    // ✅✅✅ 核心修改3：飞白发触发概率提高，飞白断墨更浓郁，印章味十足
+    const randomFade = Math.random();
+    if(randomFade > 0.98) isFade = !isFade;
+    alphaRate = isFade ? Math.max(0.2, alphaRate - fadeRate) : Math.min(1, alphaRate + fadeRate);
+    ctx.globalAlpha = alphaRate;
+    // 随机偏移范围更大，毛边更突出，柔丝质感不变
+    const dx = (Math.random() - 0.5) * offsetStep;
+    const dy = (Math.random() - 0.5) * offsetStep;
+    ctx.fillText(text, x + dx, y + dy);
+  }
+  // 最后叠加实色文字打底，笔画扎实不虚边，毛边更立体
+  ctx.globalAlpha = 1;
+  ctx.fillText(text, x, y);
+  ctx.restore();
+}
+
+// 执行绘制
+drawDoubleCircleSeal();
+drawFadeRoughText(ctx, text, centerX, centerY, textFontSize, textRoughness, sealColor);
+</script>
+</body>
+</html>
