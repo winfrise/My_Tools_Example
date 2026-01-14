@@ -1,0 +1,43 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <title>Canvas 图形精准渐变【细腻版】</title>
+    <style>canvas { border: 1px solid #eee; }</style>
+</head>
+<body>
+<canvas id="myCanvas" width="500" height="450"></canvas>
+
+<script>
+    const canvas = document.getElementById('myCanvas');
+    const ctx = canvas.getContext('2d');
+    const greenColor = '#4CAF50'; // 亮一点的基底绿，渐变反差更强
+    ctx.lineWidth = 6;
+    const rectX =40,rectY=60,rectW=240,rectH=120;
+    const circleX=rectX+rectW/2,circleY=rectY+rectH/2,circleR=45;
+
+    // 绘制所有纯绿色图形
+    ctx.fillStyle = greenColor;
+    ctx.fillRect(340,60,120,120);
+    ctx.strokeStyle = greenColor;
+    ctx.beginPath();ctx.rect(rectX,rectY,rectW,rectH);ctx.stroke();
+    ctx.beginPath();ctx.arc(circleX,circleY,circleR,0,Math.PI*2);ctx.stroke();
+
+    // 核心裁剪：仅图形区域显示渐变
+    ctx.save();
+    ctx.globalCompositeOperation = 'source-in';
+    // 细腻渐变节点
+    const gradient = ctx.createLinearGradient(0,0,0,canvas.height);
+    gradient.addColorStop(0,  'rgba(200, 255, 200, 0)');
+    gradient.addColorStop(0.3, 'rgba(50, 200, 50, 0.5)');
+    gradient.addColorStop(0.7, 'rgba(0, 150, 0, 0.9)');
+    gradient.addColorStop(1,   'rgba(0, 60, 0, 1)');
+    // 填充渐变
+    ctx.fillStyle = gradient;
+    ctx.fillRect(0,0,canvas.width,canvas.height);
+    // 恢复状态
+    ctx.restore();
+    ctx.globalCompositeOperation = 'source-over';
+</script>
+</body>
+</html>

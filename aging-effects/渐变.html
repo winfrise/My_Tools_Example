@@ -1,0 +1,43 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <title>Canvas 空心正方形+圆形 渐变描边</title>
+    <style>canvas { border: 1px solid #eee; }</style>
+</head>
+<body>
+<canvas id="myCanvas" width="400" height="400"></canvas>
+
+<script>
+    // 1. 获取画布和绘图上下文
+    const canvas = document.getElementById('myCanvas');
+    const ctx = canvas.getContext('2d');
+
+    // 2. 创建【从上到下 由浅到深】的线性渐变对象
+    // createLinearGradient(x1,y1,x2,y2) 四个参数：渐变的起点坐标、终点坐标
+    // x1=x2 → 垂直渐变（从上到下），y1<y2 → 由上到下渐变，完美实现由浅到深
+    const gradient = ctx.createLinearGradient(0, 0, 0, canvas.height);
+    
+    // 3. 设置渐变的颜色节点 - 由浅到深（可自由修改颜色和深浅）
+    // addColorStop(位置, 颜色)  位置范围 0~1 ，0是渐变起点，1是渐变终点
+    gradient.addColorStop(0, '#e0f7fa');  // 最浅：淡青色
+    gradient.addColorStop(1, '#00695c');  // 最深：深青色
+
+    // 4. 核心步骤：将渐变对象赋值给 描边样式 → 所有空心图形都会应用这个渐变
+    ctx.strokeStyle = gradient;
+
+    // 5. 设置描边的宽度（空心图形的边框粗细，可按需修改）
+    ctx.lineWidth = 4;
+
+    // ========== 绘制 空心正方形 ==========
+    ctx.beginPath(); // 开启新路径，避免图形路径粘连
+    ctx.rect(80, 60, 240, 120); // x坐标,y坐标,宽度,高度
+    ctx.stroke(); // 执行描边（空心绘制，核心方法）
+
+    // ========== 绘制 正方形下方的 空心圆形 ==========
+    ctx.beginPath(); // 开启新路径
+    ctx.arc(200, 280, 80, 0, Math.PI * 2); // x坐标,y坐标,半径,开始弧度,结束弧度(整圆)
+    ctx.stroke(); // 执行描边（空心绘制）
+</script>
+</body>
+</html>
