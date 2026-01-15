@@ -1,0 +1,316 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Video播放器-支持M3U8+缩放+中心点+局部放大镜+区域裁剪</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { padding: 20px; background: #f5f5f5; font-family: Arial, sans-serif; }
+    /* 播放器主容器：承载视频+裁剪框+放大镜，溢出隐藏，相对定位核心容器 */
+    .video-wrap {
+      width: 1280px;
+      height: 720px;
+      margin: 0 auto;
+      border: 2px solid #222;
+      background: #000;
+      position: relative;
+      overflow: hidden;
+      cursor: grab;
+    }
+    .video-wrap:active { cursor: grabbing; }
+    /* 核心视频标签：所有缩放/位移的载体，保持比例不拉伸 */
+    #video-player {
+      width: 100%;
+      height: 100%;
+      object-fit: contain;
+      transition: transform 0.15s ease;
+      transform-origin: center center; /* 默认缩放中心点：视频中心 */
+      position: absolute;
+      left: 0;
+      top: 0;
+    }
+    /* ========== 局部放大镜样式 核心 ========== */
+    .magnifier {
+      position: absolute;
+      width: 200px;
+      height: 200px;
+      border: 2px solid #409eff;
+      border-radius: 50%;
+      background: rgba(64, 158, 255, 0.1);
+      pointer-events: none; /* 穿透鼠标事件，不影响拖拽视频 */
+      display: none;
+      z-index: 10;
+      overflow: hidden;
+    }
+    /* ========== 区域裁剪预览样式 核心 ========== */
+    .crop-box {
+      position: absolute;
+      border: 2px dashed #ff7d00;
+      background: rgba(255, 125, 0, 0.08);
+      pointer-events: none;
+      display: none;
+      z-index: 8;
+    }
+    .crop-preview {
+      width: 320px;
+      height: 180px;
+      position: absolute;
+      right: 20px;
+      bottom: 20px;
+      border: 2px solid #ff7d00;
+      border-radius: 4px;
+      overflow: hidden;
+      background: #000;
+      display: none;
+      z-index: 15;
+    }
+    /* 控制面板样式：功能分区，清晰易用 */
+    .control-bar {
+      width: 1280px;
+      margin: 20px auto 0;
+      padding: 15px;
+      background: #fff;
+      border-radius: 8px;
+      box-shadow: 0 2px 12px rgba(0,0,0,0.1);
+      display: flex;
+      gap: 18px;
+      flex-wrap: wrap;
+      align-items: center;
+    }
+    button, select, input {
+      padding: 8px 14px;
+      border: 1px solid #dcdcdc;
+      border-radius: 4px;
+      background: #fff;
+      cursor: pointer;
+      font-size: 14px;
+      transition: all 0.2s;
+    }
+    button:hover { background: #409eff; color: #fff; border-color: #409eff; }
+    .group { display: flex; gap: 10px; align-items: center; }
+    .group span { color: #666; font-size: 14px; }
+    .scale-info { color: #333; font-weight: bold; font-size: 14px; }
+    hr { height: 24px; border: 1px solid #eee; }
+    .active-btn { background: #409eff; color: #fff; border-color: #409eff; }
+  </style>
+</head>
+<body>
+  <!-- 播放器核心容器 -->
+  <div class="video-wrap" id="videoContainer">
+    <video id="video-player" muted controls></video>
+    <!-- 局部放大镜 -->
+    <div class="magnifier" id="magnifier"></div>
+    <!-- 裁剪框 -->
+    <div class="crop-box" id="cropBox"></div>
+    <!-- 裁剪实时预览窗口 -->
+    <div class="crop-preview" id="cropPreview"></div>
+  </div>
+
+  <!-- 完整控制面板 -->
+  <div class="control-bar">
+    <div class="group">
+      <button id="playBtn">播放/暂停</button>
+      <button id="fullScreenBtn">全屏播放</button>
+      <select id="speedSelect">
+        <option value="0.5">0.5倍</option>
+        <option value="1" selected>1.0倍</option>
+        <option value="1.5">1.5倍</option>
+        <option value="2.0">2.0倍</option>
+      </select>
+    </div>
+    <hr>
+    <div class="group">
+      <button id="scaleDown">缩小 ↓</button>
+      <button id="scaleUp">放大 ↑</button>
+      <button id="resetBtn">还原默认</button>
+      <span class="scale-info">当前缩放：<b id="scaleText">1.00x</b></span>
+    </div>
+    <hr>
+    <div class="group">
+      <select id="originSelect" title="切换缩放中心点">
+        <option value="center center" selected>默认：视频中心</option>
+        <option value="left top">左上角</option>
+        <option value="right top">右上角</option>
+        <option value="left bottom">左下角</option>
+        <option value="right bottom">右下角</option>
+        <option value="30% 70%">自定义：30% 70%</option>
+        <option value="200px 150px">自定义：200px 150px</option>
+      </select>
+    </div>
+    <hr>
+    <div class="group">
+      <button id="magnifierBtn">开启/关闭 局部放大镜</button>
+      <button id="cropBtn">开启/关闭 区域裁剪预览</button>
+    </div>
+  </div>
+
+  <!-- 引入HLS.js 解析M3U8格式，必须CDN -->
+  <script src="https://cdn.jsdelivr.net/npm/hls.js@1.4.14/dist/hls.min.js"></script>
+  <script>
+    // ===================== 全局配置 & 核心变量 =====================
+    const video = document.getElementById('video-player');
+    const container = document.getElementById('videoContainer');
+    const magnifier = document.getElementById('magnifier');
+    const cropBox = document.getElementById('cropBox');
+    const cropPreview = document.getElementById('cropPreview');
+    // 视频源：可替换为自己的M3U8/MP4地址，这里提供测试地址（永久有效）
+    const VIDEO_SRC = "https://test-streams.mux.dev/x36xhzz/x36xhzz.m3u8"; 
+    // 缩放配置
+    let scale = 1.00;        // 默认缩放比例
+    const scaleStep = 0.05;  // 缩放步长（细腻缩放）
+    const minScale = 0.5;    // 最小缩放
+    const maxScale = 3.0;    // 最大缩放
+    // 平移配置
+    let translateX = 0, translateY = 0;
+    let isDragging = false;
+    let startX, startY;
+    // 放大镜配置
+    let isMagnifierOpen = false;
+    const magnifierScale = 2.0; // 放大镜放大倍数
+    const magnifierSize = {w:200, h:200};
+    // 裁剪配置
+    let isCropOpen = false;
+    const cropInitSize = {w:400, h:225}; // 初始裁剪框大小
+    let cropX = 0, cropY = 0;
+
+    // ===================== 第一步：初始化视频播放（兼容M3U8+普通视频） =====================
+    function initVideoPlay() {
+      if (VIDEO_SRC.includes('.m3u8') && Hls.isSupported()) {
+        const hls = new Hls();
+        hls.loadSource(VIDEO_SRC);
+        hls.attachMedia(video);
+        hls.on(Hls.Events.MANIFEST_PARSED, () => {
+          console.log('M3U8解析成功，视频就绪');
+        });
+      } else {
+        // 普通视频格式 MP4/WebM 直接赋值
+        video.src = VIDEO_SRC;
+      }
+      // 视频加载完成后初始化裁剪框位置
+      video.onloadedmetadata = () => {
+        cropX = (container.clientWidth - cropInitSize.w) / 2;
+        cropY = (container.clientHeight - cropInitSize.h) / 2;
+        cropBox.style.width = `${cropInitSize.w}px`;
+        cropBox.style.height = `${cropInitSize.h}px`;
+        cropBox.style.left = `${cropX}px`;
+        cropBox.style.top = `${cropY}px`;
+      }
+    }
+    initVideoPlay();
+
+    // ===================== 第二步：核心功能 - 视频缩放 + 自定义缩放中心点 =====================
+    // 更新视频缩放和位移样式
+    function updateVideoTransform() {
+      scale = parseFloat(scale.toFixed(2)); // 保留两位小数，避免精度问题
+      video.style.transform = `scale(${scale}) translate(${translateX}px, ${translateY}px)`;
+      document.getElementById('scaleText').innerText = `${scale}x`;
+    }
+    // 缩小
+    document.getElementById('scaleDown').onclick = () => {
+      if (scale > minScale) { scale -= scaleStep; updateVideoTransform(); }
+    }
+    // 放大
+    document.getElementById('scaleUp').onclick = () => {
+      if (scale < maxScale) { scale += scaleStep; updateVideoTransform(); }
+    }
+    // 切换缩放中心点
+    document.getElementById('originSelect').onchange = (e) => {
+      video.style.transformOrigin = e.target.value;
+    }
+    // 鼠标滚轮快捷缩放（核心体验优化）
+    container.addEventListener('wheel', (e) => {
+      e.preventDefault();
+      e.deltaY < 0 ? scale = Math.min(scale + scaleStep, maxScale) : scale = Math.max(scale - scaleStep, minScale);
+      updateVideoTransform();
+    });
+
+    // ===================== 第三步：核心功能 - 视频拖拽平移（缩放后必备） =====================
+    container.addEventListener('mousedown', (e) => {
+      isDragging = true;
+      startX = e.clientX - translateX;
+      startY = e.clientY - translateY;
+      container.style.cursor = 'grabbing';
+    });
+    document.addEventListener('mousemove', (e) => {
+      if (!isDragging) return;
+      translateX = e.clientX - startX;
+      translateY = e.clientY - startY;
+      updateVideoTransform();
+    });
+    document.addEventListener('mouseup', () => {
+      isDragging = false;
+      container.style.cursor = 'grab';
+    });
+
+    // ===================== 第四步：核心新增功能 - 局部放大镜（精准放大视频任意区域） =====================
+    document.getElementById('magnifierBtn').onclick = () => {
+      isMagnifierOpen = !isMagnifierOpen;
+      this.classList.toggle('active-btn');
+      magnifier.style.display = isMagnifierOpen ? 'block' : 'none';
+    }
+    // 放大镜跟随鼠标 + 实时放大对应区域
+    container.addEventListener('mousemove', (e) => {
+      if (!isMagnifierOpen || video.paused) return;
+      const { left, top } = container.getBoundingClientRect();
+      // 鼠标在容器内的坐标
+      const mouseX = e.clientX - left;
+      const mouseY = e.clientY - top;
+      // 放大镜居中跟随鼠标
+      const magX = mouseX - magnifierSize.w / 2;
+      const magY = mouseY - magnifierSize.h / 2;
+      magnifier.style.left = `${magX}px`;
+      magnifier.style.top = `${magY}px`;
+      // 核心：放大镜内显示的是 视频对应区域 * 放大镜倍数 的画面
+      magnifier.style.backgroundImage = `url(${video.currentSrc})`;
+      magnifier.style.backgroundSize = `${video.videoWidth * scale * magnifierScale}px ${video.videoHeight * scale * magnifierScale}px`;
+      magnifier.style.backgroundPosition = `-${mouseX * scale * magnifierScale - magnifierSize.w/2}px -${mouseY * scale * magnifierScale - magnifierSize.h/2}px`;
+    });
+
+    // ===================== 第五步：核心新增功能 - 区域裁剪预览（框选+实时预览裁剪效果） =====================
+    document.getElementById('cropBtn').onclick = () => {
+      isCropOpen = !isCropOpen;
+      this.classList.toggle('active-btn');
+      cropBox.style.display = isCropOpen ? 'block' : 'none';
+      cropPreview.style.display = isCropOpen ? 'block' : 'none';
+      if(isCropOpen) updateCropPreview(); // 开启后立即预览
+    }
+    // 实时更新裁剪预览画面
+    function updateCropPreview() {
+      if (!isCropOpen || video.paused) return;
+      const { width: cw, height: ch } = container.getBoundingClientRect();
+      const { width: vbw, height: vbh } = video.getBoundingClientRect();
+      const { width: cbw, height: cbh } = cropBox.getBoundingClientRect();
+      // 计算裁剪区域占比 + 视频缩放比例，精准映射预览画面
+      const cropRatioX = cropX / cw;
+      const cropRatioY = cropY / ch;
+      const cropRatioW = cbw / cw;
+      const cropRatioH = cbh / ch;
+      cropPreview.style.backgroundImage = `url(${video.currentSrc})`;
+      cropPreview.style.backgroundSize = `${vbw * scale}px ${vbh * scale}px`;
+      cropPreview.style.backgroundPosition = `-${vbw * scale * cropRatioX}px -${vbh * scale * cropRatioY}px`;
+      cropPreview.style.backgroundClip = `rect(0, ${vbw * scale * cropRatioW}px, ${vbh * scale * cropRatioH}px, 0)`;
+    }
+    // 播放过程中持续更新裁剪预览
+    video.addEventListener('timeupdate', updateCropPreview);
+
+    // ===================== 基础播放控制功能 =====================
+    document.getElementById('playBtn').onclick = () => video.paused ? video.play() : video.pause();
+    document.getElementById('fullScreenBtn').onclick = () => {
+      container.requestFullscreen?.() || container.webkitRequestFullscreen?.();
+    }
+    document.getElementById('speedSelect').onchange = (e) => {
+      video.playbackRate = parseFloat(e.target.value);
+    }
+    // 还原默认尺寸/位置/中心点
+    document.getElementById('resetBtn').onclick = () => {
+      scale = 1.00;
+      translateX = 0;
+      translateY = 0;
+      video.style.transformOrigin = 'center center';
+      document.getElementById('originSelect').value = 'center center';
+      updateVideoTransform();
+    };
+  </script>
+</body>
+</html>

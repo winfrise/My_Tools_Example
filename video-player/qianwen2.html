@@ -1,0 +1,501 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>视频播放器 - 支持正方形/长方形/圆形蒙版</title>
+  <script src="https://cdn.jsdelivr.net/npm/hls.js@latest"></script>
+  <style>
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      margin: 0; padding: 20px; background: #f5f5f5;
+    }
+    .player-wrapper { max-width: 960px; margin: 0 auto; }
+    .player-fullscreen-target {
+      position: relative; border: 1px solid #ccc; background: #000;
+      --controls-height: 70px;
+    }
+    .video-container {
+      position: relative; width: 100%; height: 500px; overflow: hidden; background: #000;
+    }
+    #video {
+      width: 100%; height: 100%; object-fit: contain;
+      transform-origin: center center;
+    }
+    #maskCanvas {
+      position: absolute; top: 0; left: 0; width: 100%; height: 100%;
+      pointer-events: none; z-index: 10;
+      display: none; /* 默认隐藏 */
+    }
+    .custom-controls {
+      position: relative; background: rgba(0,0,0,0.85); color: white; padding: 8px 12px;
+    }
+    .progress-row {
+      width: 100%; height: 6px; background: #444; border-radius: 3px; cursor: pointer; margin-bottom: 8px;
+    }
+    .progress-bar { height: 100%; background: #1e90ff; border-radius: 3px; width: 0%; transition: width 0.1s; }
+    .controls-row { display: flex; justify-content: space-between; align-items: center; }
+    .control-btn {
+      background: none; border: 1px solid #666; color: white; padding: 4px 10px; border-radius: 4px;
+      cursor: pointer; font-size: 14px; min-width: 36px; text-align: center;
+    }
+    .control-btn:hover { background: rgba(255,255,255,0.1); border-color: #999; }
+    .status-group { display: flex; align-items: center; gap: 12px; }
+    .time-display { font-size: 13px; white-space: nowrap; }
+    .volume-control { display: flex; align-items: center; gap: 6px; }
+    .volume-slider { width: 60px; height: 4px; background: #444; border-radius: 2px; cursor: pointer; position: relative; }
+    .volume-level { height: 100%; background: white; border-radius: 2px; width: 80%; }
+    select {
+      background: rgba(255,255,255,0.1); color: white; border: 1px solid #666;
+      border-radius: 3px; padding: 2px 6px; font-size: 12px; cursor: pointer;
+    }
+    .player-fullscreen-target.fullscreen {
+      position: fixed !important; top: 0 !important; left: 0 !important;
+      width: 100vw !important; height: 100vh !important; z-index: 2000; background: #000;
+    }
+    .player-fullscreen-target.fullscreen .video-container {
+      height: calc(100vh - var(--controls-height)) !important;
+    }
+    .top-controls {
+      display: flex; flex-wrap: wrap; gap: 10px; margin-top: 10px; align-items: center;
+    }
+    button { padding: 6px 12px; cursor: pointer; }
+    input[type="text"] { flex: 1; min-width: 200px; padding: 6px; }
+    .hint {
+      font-size: 12px; color: #666; margin-top: 5px;
+    }
+  </style>
+</head>
+<body>
+  <div class="player-wrapper">
+    <h2>视频播放器 - 支持正方形 / 长方形 / 圆形蒙版</h2>
+
+    <div class="player-fullscreen-target" id="fullscreenTarget">
+      <div class="video-container" id="container">
+        <video id="video"></video>
+        <canvas id="maskCanvas"></canvas>
+      </div>
+
+      <div class="custom-controls">
+        <div class="progress-row" id="progressContainer">
+          <div class="progress-bar" id="progressBar"></div>
+        </div>
+        <div class="controls-row">
+          <div class="playback-controls">
+            <button class="control-btn" id="toStart">««</button>
+            <button class="control-btn" id="rewind">«</button>
+            <button class="control-btn" id="playPause">▶</button>
+            <button class="control-btn" id="forward">»</button>
+            <button class="control-btn" id="toEnd">»»</button>
+          </div>
+          <div class="status-group">
+            <span class="time-display" id="timeDisplay">00:00 / 00:00</span>
+            <div class="volume-control">
+              <span>🔈</span>
+              <div class="volume-slider" id="volumeSlider">
+                <div class="volume-level" id="volumeLevel"></div>
+              </div>
+            </div>
+            <select class="speed-select" id="speedSelect">
+              <option value="0.5">0.5x</option>
+              <option value="0.75">0.75x</option>
+              <option value="1" selected>1x</option>
+              <option value="1.25">1.25x</option>
+              <option value="1.5">1.5x</option>
+              <option value="2">2x</option>
+            </select>
+            <button class="control-btn" id="fullscreenBtn">全屏</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="top-controls">
+      <input type="text" id="urlInput" placeholder="输入视频地址（支持 .m3u8 或 .mp4）"
+             value="https://test-streams.mux.dev/x36xhzz/x36xhzz.m3u8" />
+      <button id="loadBtn">加载视频</button>
+      <button id="zoomIn">+</button>
+      <button id="zoomOut">−</button>
+      <span id="zoomLevel">100%</span>
+      <button id="resetView">重置视图</button>
+
+      <!-- 蒙版控制 -->
+      <button id="toggleMaskMode">开启蒙版绘制</button>
+      <select id="maskShapeSelect">
+        <option value="rect">长方形</option>
+        <option value="square">正方形</option>
+        <option value="circle">圆形</option>
+      </select>
+      <label>
+        遮罩颜色:
+        <input type="color" id="maskColor" value="#000000" />
+      </label>
+      <label>
+        透明度:
+        <input type="range" id="maskOpacity" min="0" max="1" step="0.01" value="0.7" />
+      </label>
+      <button id="clearMasks">清空所有蒙版</button>
+    </div>
+    <p class="hint">
+      操作提示：<br>
+      • 开启“蒙版绘制”后，在视频区域拖动创建蒙版<br>
+      • 已有蒙版：左键拖动移动，右键点击删除<br>
+      • 关闭蒙版模式后，遮罩自动隐藏，视频正常播放
+    </p>
+  </div>
+
+  <script>
+    // ========== DOM ==========
+    const video = document.getElementById('video');
+    const container = document.getElementById('container');
+    const maskCanvas = document.getElementById('maskCanvas');
+    const maskCtx = maskCanvas.getContext('2d');
+
+    // 控件
+    const urlInput = document.getElementById('urlInput');
+    const loadBtn = document.getElementById('loadBtn');
+    const zoomInBtn = document.getElementById('zoomIn');
+    const zoomOutBtn = document.getElementById('zoomOut');
+    const resetBtn = document.getElementById('resetView');
+    const zoomLevelEl = document.getElementById('zoomLevel');
+    const playPauseBtn = document.getElementById('playPause');
+    const progressContainer = document.getElementById('progressContainer');
+    const progressBar = document.getElementById('progressBar');
+    const timeDisplay = document.getElementById('timeDisplay');
+    const volumeSlider = document.getElementById('volumeSlider');
+    const volumeLevel = document.getElementById('volumeLevel');
+    const speedSelect = document.getElementById('speedSelect');
+    const fullscreenBtn = document.getElementById('fullscreenBtn');
+    const toggleMaskModeBtn = document.getElementById('toggleMaskMode');
+    const maskShapeSelect = document.getElementById('maskShapeSelect');
+    const maskColorInput = document.getElementById('maskColor');
+    const maskOpacityInput = document.getElementById('maskOpacity');
+    const clearMasksBtn = document.getElementById('clearMasks');
+
+    // ========== 状态 ==========
+    let scale = 1, translateX = 0, translateY = 0;
+    const minScale = 0.1, maxScale = 10;
+
+    let isPanning = false;
+    let startPanX = 0, startPanY = 0;
+
+    let isMaskMode = false;
+    let masks = []; // { x, y, w, h, shape: 'rect' | 'square' | 'circle' }
+    let drawingMask = null;
+    let draggingMaskIndex = -1;
+
+    // ========== 工具函数 ==========
+    function formatTime(seconds) {
+      if (isNaN(seconds)) return '00:00';
+      const mins = Math.floor(seconds / 60);
+      const secs = Math.floor(seconds % 60);
+      return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
+    }
+
+    function updateTransform() {
+      video.style.transform = `scale(${scale}) translate(${translateX}px, ${translateY}px)`;
+      zoomLevelEl.textContent = `${Math.round(scale * 100)}%`;
+    }
+
+    function resetView() {
+      scale = 1; translateX = 0; translateY = 0;
+      updateTransform();
+    }
+
+    function loadVideo(src) {
+      resetView();
+      if (Hls.isSupported() && src.endsWith('.m3u8')) {
+        if (video.hls) video.hls.destroy();
+        const hls = new Hls();
+        video.hls = hls;
+        hls.loadSource(src);
+        hls.attachMedia(video);
+      } else {
+        video.src = src;
+      }
+    }
+
+    // ========== 蒙版渲染 ==========
+    function renderMask() {
+      if (!isMaskMode) {
+        maskCanvas.style.display = 'none';
+        return;
+      }
+
+      maskCanvas.style.display = 'block';
+      const rect = container.getBoundingClientRect();
+      maskCanvas.width = rect.width;
+      maskCanvas.height = rect.height;
+
+      const ctx = maskCtx;
+      ctx.clearRect(0, 0, maskCanvas.width, maskCanvas.height);
+
+      // 填充遮罩背景
+      const opacity = parseFloat(maskOpacityInput.value);
+      const color = maskColorInput.value;
+      ctx.fillStyle = color + Math.round(opacity * 255).toString(16).padStart(2, '0');
+      ctx.fillRect(0, 0, maskCanvas.width, maskCanvas.height);
+
+      // 挖掉蒙版区域
+      ctx.globalCompositeOperation = 'destination-out';
+
+      [...masks, drawingMask].forEach(mask => {
+        if (!mask) return;
+        drawMask(ctx, mask);
+      });
+
+      ctx.globalCompositeOperation = 'source-over';
+    }
+
+    function drawMask(ctx, mask) {
+      const { x, y, w, h, shape } = mask;
+      if (shape === 'circle') {
+        const r = Math.min(w, h) / 2;
+        const cx = x + w / 2;
+        const cy = y + h / 2;
+        ctx.beginPath();
+        ctx.arc(cx, cy, r, 0, Math.PI * 2);
+        ctx.fill();
+      } else if (shape === 'square') {
+        // 强制为正方形：取宽高中较小值
+        const size = Math.min(Math.abs(w), Math.abs(h));
+        const actualW = w >= 0 ? size : -size;
+        const actualH = h >= 0 ? size : -size;
+        const drawX = w >= 0 ? x : x + actualW;
+        const drawY = h >= 0 ? y : y + actualH;
+        ctx.fillRect(drawX, drawY, Math.abs(actualW), Math.abs(actualH));
+      } else {
+        // 'rect' —— 普通矩形
+        ctx.fillRect(x, y, w, h);
+      }
+    }
+
+    function clearMasks() {
+      masks = [];
+      renderMask();
+    }
+
+    function isPointInMask(px, py, mask) {
+      const { x, y, w, h, shape } = mask;
+      if (shape === 'circle') {
+        const r = Math.min(Math.abs(w), Math.abs(h)) / 2;
+        const cx = x + w / 2;
+        const cy = y + h / 2;
+        return Math.hypot(px - cx, py - cy) <= r;
+      } else if (shape === 'square') {
+        const size = Math.min(Math.abs(w), Math.abs(h));
+        const left = w >= 0 ? x : x + w;
+        const top = h >= 0 ? y : y + h;
+        const right = left + size;
+        const bottom = top + size;
+        return px >= left && px <= right && py >= top && py <= bottom;
+      } else {
+        const left = Math.min(x, x + w);
+        const right = Math.max(x, x + w);
+        const top = Math.min(y, y + h);
+        const bottom = Math.max(y, y + h);
+        return px >= left && px <= right && py >= top && py <= bottom;
+      }
+    }
+
+    // ========== 事件绑定 ==========
+    // 缩放与平移
+    zoomInBtn.addEventListener('click', () => {
+      scale = Math.min(maxScale, scale + 0.2);
+      updateTransform();
+    });
+    zoomOutBtn.addEventListener('click', () => {
+      scale = Math.max(minScale, scale - 0.2);
+      updateTransform();
+    });
+    resetBtn.addEventListener('click', resetView);
+
+    container.addEventListener('wheel', (e) => {
+      e.preventDefault();
+      const delta = e.deltaY > 0 ? -0.1 : 0.1;
+      scale = Math.min(maxScale, Math.max(minScale, scale + delta));
+      updateTransform();
+    }, { passive: false });
+
+    // 主要交互
+    container.addEventListener('mousedown', (e) => {
+      const rect = container.getBoundingClientRect();
+      const localX = e.clientX - rect.left;
+      const localY = e.clientY - rect.top;
+
+      if (isMaskMode) {
+        // 检查是否点击到已有蒙版
+        let clickedMaskIndex = -1;
+        for (let i = masks.length - 1; i >= 0; i--) {
+          if (isPointInMask(localX, localY, masks[i])) {
+            clickedMaskIndex = i;
+            break;
+          }
+        }
+
+        if (clickedMaskIndex >= 0) {
+          if (e.button === 2) { // 右键删除
+            e.preventDefault();
+            masks.splice(clickedMaskIndex, 1);
+            renderMask();
+            return;
+          } else if (e.button === 0) { // 左键拖动
+            draggingMaskIndex = clickedMaskIndex;
+            const mask = masks[draggingMaskIndex];
+            startPanX = localX - mask.x;
+            startPanY = localY - mask.y;
+            container.style.cursor = 'grabbing';
+            e.preventDefault();
+            return;
+          }
+        }
+
+        // 开始绘制新蒙版
+        drawingMask = {
+          startX: localX,
+          startY: localY,
+          x: localX,
+          y: localY,
+          w: 0,
+          h: 0,
+          shape: maskShapeSelect.value
+        };
+        e.preventDefault();
+        return;
+      }
+
+      // 非蒙版模式：平移
+      isPanning = true;
+      startPanX = e.clientX - translateX;
+      startPanY = e.clientY - translateY;
+      container.style.cursor = 'grabbing';
+      e.preventDefault();
+    });
+
+    window.addEventListener('mousemove', (e) => {
+      const rect = container.getBoundingClientRect();
+      const localX = e.clientX - rect.left;
+      const localY = e.clientY - rect.top;
+
+      if (draggingMaskIndex >= 0) {
+        const mask = masks[draggingMaskIndex];
+        mask.x = localX - startPanX;
+        mask.y = localY - startPanY;
+        renderMask();
+        return;
+      }
+
+      if (drawingMask) {
+        const dx = localX - drawingMask.startX;
+        const dy = localY - drawingMask.startY;
+        drawingMask.w = dx;
+        drawingMask.h = dy;
+        drawingMask.x = dx >= 0 ? drawingMask.startX : localX;
+        drawingMask.y = dy >= 0 ? drawingMask.startY : localY;
+        renderMask();
+        return;
+      }
+
+      if (isPanning) {
+        translateX = e.clientX - startPanX;
+        translateY = e.clientY - startPanY;
+        updateTransform();
+        return;
+      }
+    });
+
+    window.addEventListener('mouseup', () => {
+      if (drawingMask) {
+        const { w, h } = drawingMask;
+        if (Math.abs(w) > 5 && Math.abs(h) > 5) {
+          masks.push({
+            x: drawingMask.x,
+            y: drawingMask.y,
+            w: Math.abs(w),
+            h: Math.abs(h),
+            shape: drawingMask.shape
+          });
+        }
+        drawingMask = null;
+        renderMask();
+        return;
+      }
+
+      if (draggingMaskIndex >= 0) {
+        draggingMaskIndex = -1;
+        container.style.cursor = 'crosshair';
+        return;
+      }
+
+      if (isPanning) {
+        isPanning = false;
+        container.style.cursor = isMaskMode ? 'crosshair' : 'move';
+      }
+    });
+
+    // 禁用右键菜单
+    container.addEventListener('contextmenu', (e) => {
+      if (isMaskMode) e.preventDefault();
+    });
+
+    // 蒙版控制
+    toggleMaskModeBtn.addEventListener('click', () => {
+      isMaskMode = !isMaskMode;
+      toggleMaskModeBtn.textContent = isMaskMode ? '关闭蒙版绘制' : '开启蒙版绘制';
+      container.style.cursor = isMaskMode ? 'crosshair' : 'move';
+      renderMask();
+    });
+
+    clearMasksBtn.addEventListener('click', clearMasks);
+    [maskColorInput, maskOpacityInput].forEach(el => {
+      el.addEventListener('input', renderMask);
+    });
+
+    // ========== 视频控制 ==========
+    video.addEventListener('loadedmetadata', () => {
+      timeDisplay.textContent = `00:00 / ${formatTime(video.duration)}`;
+    });
+    video.addEventListener('timeupdate', () => {
+      const percent = (video.currentTime / (video.duration || 1)) * 100;
+      progressBar.style.width = `${percent}%`;
+      timeDisplay.textContent = `${formatTime(video.currentTime)} / ${formatTime(video.duration)}`;
+    });
+    playPauseBtn.addEventListener('click', () => {
+      if (video.paused) { video.play(); playPauseBtn.textContent = '⏸'; }
+      else { video.pause(); playPauseBtn.textContent = '▶'; }
+    });
+    progressContainer.addEventListener('click', (e) => {
+      const rect = progressContainer.getBoundingClientRect();
+      const clickX = e.clientX - rect.left;
+      const ratio = Math.max(0, Math.min(1, clickX / rect.width));
+      video.currentTime = ratio * (video.duration || 0);
+    });
+    volumeSlider.addEventListener('click', (e) => {
+      const rect = volumeSlider.getBoundingClientRect();
+      const clickX = e.clientX - rect.left;
+      let vol = Math.max(0, Math.min(1, clickX / rect.width));
+      video.volume = vol;
+      volumeLevel.style.width = `${vol * 100}%`;
+    });
+    speedSelect.addEventListener('change', () => {
+      video.playbackRate = parseFloat(speedSelect.value);
+    });
+
+    // 全屏
+    function toggleFullscreen() {
+      if (!document.fullscreenElement) fullscreenTarget.requestFullscreen();
+      else document.exitFullscreen();
+    }
+    fullscreenBtn.addEventListener('click', toggleFullscreen);
+    document.addEventListener('fullscreenchange', () => {
+      fullscreenBtn.textContent = document.fullscreenElement ? '退出全屏' : '全屏';
+      setTimeout(renderMask, 100);
+    });
+
+    // 初始化
+    loadBtn.addEventListener('click', () => loadVideo(urlInput.value.trim()));
+    window.addEventListener('load', () => loadVideo(urlInput.value.trim()));
+    window.addEventListener('resize', renderMask);
+  </script>
+</body>
+</html>
