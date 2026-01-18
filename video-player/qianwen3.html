@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>视频播放器 - 可拖拽蒙版 + 中心缩放</title>
+  <title>视频播放器 - 可拖拽蒙版（无放大）</title>
   <script src="https://cdn.jsdelivr.net/npm/hls.js@latest"></script>
   <style>
     body {
@@ -172,7 +172,7 @@
 </head>
 <body>
   <div class="player-wrapper">
-    <h2>视频播放器 - 可拖拽蒙版 + 中心缩放</h2>
+    <h2>视频播放器 - 可拖拽蒙版（无放大）</h2>
 
     <div class="top-controls">
       <input type="file" id="localVideoInput" accept="video/*" style="display:none;" />
@@ -239,9 +239,8 @@
       操作说明：<br>
       • 开启绘制 → 拖拽创建蒙版区域<br>
       • 创建后可拖拽整个蒙版移动位置<br>
-      • 鼠标悬停在蒙版上 → 滚轮调节放大倍数<br>
-      • 全局缩放（无蒙版时）以鼠标位置为中心<br>
-      • 放大镜内容始终显示其中心点对应的视频区域
+      • 蒙版区域显示原始比例的视频内容（无放大）<br>
+      • 全局缩放（无蒙版时）以鼠标位置为中心
     </p>
   </div>
 
@@ -277,13 +276,11 @@
     const minScale = 0.1, maxScale = 10;
 
     let isMaskMode = false;
-    let mask = null; // { type, x/y/w/h 或 cx/cy/radius, zoom }
+    let mask = null; // { type, x/y/w/h 或 cx/cy/radius }
     let isDrawing = false;
     let drawStart = { x: 0, y: 0 };
     let isDraggingMask = false;
     let dragOffset = { x: 0, y: 0 };
-    let mouseInVideo = false;
-    let lastMousePos = { x: 0, y: 0 };
 
     // ========== 工具函数 ==========
     function formatTime(seconds) {
@@ -327,7 +324,7 @@
       video.load();
     }
 
-    // ========== 渲染蒙版 ==========
+    // ========== 渲染蒙版（无放大）==========
     function renderMask() {
       const rect = container.getBoundingClientRect();
       maskCanvas.width = rect.width;
@@ -354,38 +351,28 @@
         ctx.beginPath();
         ctx.arc(mask.cx, mask.cy, mask.radius, 0, Math.PI * 2);
         ctx.clip();
+        // 绘制圆形区域（使用外接正方形）
+        const x = mask.cx - mask.radius;
+        const y = mask.cy - mask.radius;
+        const size = mask.radius * 2;
+        drawVideoRegion(ctx, x, y, size);
       } else {
         ctx.rect(mask.x, mask.y, mask.width, mask.height);
         ctx.clip();
+        drawVideoRegion(ctx, mask.x, mask.y, mask.width, mask.height);
       }
-
-      // 获取蒙版中心和尺寸
-      let cx, cy, size;
-      if (mask.type === 'circle') {
-        cx = mask.cx;
-        cy = mask.cy;
-        size = mask.radius * 2;
-      } else {
-        cx = mask.x + mask.width / 2;
-        cy = mask.y + mask.height / 2;
-        size = Math.max(mask.width, mask.height);
-      }
-
-      const videoRect = getVideoRect();
-      const relX = (cx - videoRect.left) / scale;
-      const relY = (cy - videoRect.top) / scale;
-      const zoom = mask.zoom || 1.5;
-      const srcSize = size / zoom;
-      const srcX = relX - srcSize / 2;
-      const srcY = relY - srcSize / 2;
-
-      ctx.drawImage(
-        video,
-        srcX, srcY, srcSize, srcSize,
-        cx - size / 2, cy - size / 2, size, size
-      );
 
       ctx.restore();
+    }
+
+    // 在指定区域绘制 1:1 视频内容（无缩放）
+    function drawVideoRegion(ctx, dstX, dstY, dstW, dstH = dstW) {
+      const videoRect = getVideoRect();
+      const srcX = (dstX - videoRect.left) / scale;
+      const srcY = (dstY - videoRect.top) / scale;
+      const srcW = dstW / scale;
+      const srcH = dstH / scale;
+      ctx.drawImage(video, srcX, srcY, srcW, srcH, dstX, dstY, dstW, dstH);
     }
 
     function clearMask() {
@@ -433,28 +420,13 @@
       const mouseX = e.clientX - rect.left;
       const mouseY = e.clientY - rect.top;
 
-      if (mask && isPointInMask(mouseX, mouseY)) {
-        // 调节蒙版放大倍数
-        const delta = e.deltaY > 0 ? -0.1 : 0.1;
-        mask.zoom = Math.min(3, Math.max(0.5, (mask.zoom || 1.5) + delta));
-        renderMask();
-        return;
-      }
+      // ✂️ 不再处理蒙版区域的滚轮（无 zoom 功能）
 
-      // 否则全局缩放（以鼠标为中心）
+      // 全局缩放
       const oldScale = scale;
       const delta = e.deltaY > 0 ? -0.1 : 0.1;
       scale = Math.min(maxScale, Math.max(minScale, scale + delta));
 
-      // 计算新偏移，使缩放中心为鼠标位置
-      const videoRect = getVideoRect();
-      const worldMouseX = mouseX - videoRect.left + translateX;
-      const worldMouseY = mouseY - videoRect.top + translateY;
-
-      const newWorldMouseX = (mouseX - (rect.width - video.videoWidth * scale) / 2) / scale;
-      const newWorldMouseY = (mouseY - (rect.height - video.videoHeight * scale) / 2) / scale;
-
-      // 更简单方式：基于缩放比例调整偏移
       const factor = scale / oldScale;
       translateX = mouseX - (mouseX - translateX) * factor;
       translateY = mouseY - (mouseY - translateY) * factor;
@@ -467,14 +439,11 @@
       const rect = container.getBoundingClientRect();
       const x = e.clientX - rect.left;
       const y = e.clientY - rect.top;
-      lastMousePos = { x, y };
 
       if (isMaskMode && !mask) {
-        // 开始绘制
         isDrawing = true;
         drawStart = { x, y };
       } else if (mask && isPointInMask(x, y)) {
-        // 开始拖拽蒙版
         isDraggingMask = true;
         if (mask.type === 'circle') {
           dragOffset.x = x - mask.cx;
@@ -490,8 +459,6 @@
       const rect = container.getBoundingClientRect();
       const x = e.clientX - rect.left;
       const y = e.clientY - rect.top;
-      lastMousePos = { x, y };
-      mouseInVideo = true;
 
       if (isDrawing && isMaskMode) {
         const shape = maskShapeSelect.value;
@@ -503,8 +470,7 @@
             type: 'circle',
             cx: drawStart.x,
             cy: drawStart.y,
-            radius: radius,
-            zoom: mask?.zoom || 1.5
+            radius: radius
           };
         } else {
           let w = Math.abs(x - drawStart.x);
@@ -520,8 +486,7 @@
             x: x0,
             y: y0,
             width: w,
-            height: h,
-            zoom: mask?.zoom || 1.5
+            height: h
           };
         }
         renderMask();
@@ -540,10 +505,6 @@
     window.addEventListener('mouseup', () => {
       isDrawing = false;
       isDraggingMask = false;
-    });
-
-    container.addEventListener('mouseleave', () => {
-      mouseInVideo = false;
     });
 
     // ========== 控制按钮 ==========
@@ -566,7 +527,7 @@
       const percent = (video.currentTime / (video.duration || 1)) * 100;
       progressBar.style.width = `${percent}%`;
       timeDisplay.textContent = `${formatTime(video.currentTime)} / ${formatTime(video.duration)}`;
-      if (mask) renderMask(); // 实时更新放大内容
+      if (mask) renderMask(); // 实时更新蒙版内容
     });
     playPauseBtn.addEventListener('click', () => {
       if (video.paused) { video.play(); playPauseBtn.textContent = '⏸'; }

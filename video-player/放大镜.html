@@ -1,0 +1,236 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Video Magnifier - Fixed</title>
+    <style>
+        body, html {
+            margin: 0;
+            padding: 0;
+            width: 100%;
+            height: 100%;
+            overflow: hidden;
+            background: #000;
+            font-family: Arial, sans-serif;
+        }
+
+        .container {
+            position: relative;
+            width: 100%;
+            height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+
+        .video-container {
+            position: relative;
+            width: 80%;
+            max-width: 1200px;
+            height: 60vh;
+            max-height: 700px;
+            overflow: hidden;
+            border-radius: 10px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.7);
+            cursor: grab;
+        }
+
+        video {
+            width: 100%;
+            height: 100%;
+            object-fit: contain;
+            background: #000;
+            cursor: grab;
+        }
+
+        .magnifier {
+            position: absolute;
+            width: 250px;
+            height: 250px;
+            border: 2px solid rgba(255, 255, 255, 0.7);
+            border-radius: 50%;
+            pointer-events: none;
+            display: none;
+            box-shadow: 0 0 20px rgba(255, 255, 255, 0.5);
+            background: rgba(0, 0, 0, 0.3);
+            z-index: 10;
+        }
+
+        .info {
+            position: absolute;
+            bottom: 20px;
+            left: 0;
+            right: 0;
+            text-align: center;
+            color: white;
+            background: rgba(0,0,0,0.5);
+            padding: 10px;
+            border-radius: 5px;
+            font-size: 14px;
+        }
+
+        .controls {
+            position: absolute;
+            top: 20px;
+            right: 20px;
+            background: rgba(0,0,0,0.5);
+            padding: 10px;
+            border-radius: 5px;
+            z-index: 10;
+        }
+
+        .controls button {
+            background: #4a90e2;
+            color: white;
+            border: none;
+            padding: 8px 15px;
+            border-radius: 4px;
+            cursor: pointer;
+            margin: 0 5px;
+            transition: all 0.3s;
+        }
+
+        .controls button:hover {
+            background: #3a7bd5;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="video-container" id="videoContainer">
+            <video id="video" controls>
+                <source src="https://vjs.zencdn.net/v/oceans.mp4?spm=5176.28103460.0.0.3b837d835Of0wZ&file=oceans.mp4" type="video/mp4">
+                Your browser does not support the video tag.
+            </video>
+            <div id="magnifier" class="magnifier"></div>
+        </div>
+        
+        <div class="info">
+            <p>Move your mouse over the video to see the magnifier effect. Click and drag to scroll the video.</p>
+        </div>
+        
+        <div class="controls">
+            <button id="resetBtn">Reset View</button>
+        </div>
+    </div>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            const video = document.getElementById('video');
+            const magnifier = document.getElementById('magnifier');
+            const magnifierCanvas = document.createElement('canvas');
+            magnifier.appendChild(magnifierCanvas);
+            const magnifierCtx = magnifierCanvas.getContext('2d');
+            
+            // 设置放大镜尺寸
+            const magnifierSize = 250;
+            const zoomFactor = 3; // 放大倍数
+            
+            // 初始化放大镜尺寸
+            magnifierCanvas.width = magnifierSize;
+            magnifierCanvas.height = magnifierSize;
+            
+            // 拖动视频功能
+            let isDragging = false;
+            let startX, startY;
+            let scrollLeft, scrollTop;
+            
+            const videoContainer = document.getElementById('videoContainer');
+            
+            videoContainer.addEventListener('mousedown', (e) => {
+                isDragging = true;
+                startX = e.clientX;
+                startY = e.clientY;
+                scrollLeft = videoContainer.scrollLeft;
+                scrollTop = videoContainer.scrollTop;
+            });
+            
+            document.addEventListener('mousemove', (e) => {
+                if (!isDragging) return;
+                
+                const x = e.clientX;
+                const y = e.clientY;
+                const walkX = (x - startX) * 1.5;
+                const walkY = (y - startY) * 1.5;
+                
+                videoContainer.scrollLeft = scrollLeft - walkX;
+                videoContainer.scrollTop = scrollTop - walkY;
+                
+                startX = x;
+                startY = y;
+            });
+            
+            document.addEventListener('mouseup', () => {
+                isDragging = false;
+            });
+            
+            // 视频鼠标移动事件
+            video.addEventListener('mousemove', (e) => {
+                // 获取视频元素的边界
+                const rect = video.getBoundingClientRect();
+                
+                // 计算相对于视频元素的坐标
+                const x = e.clientX - rect.left;
+                const y = e.clientY - rect.top;
+                
+                // 限制坐标在视频区域内
+                const videoWidth = video.clientWidth;
+                const videoHeight = video.clientHeight;
+                
+                const clampX = Math.max(0, Math.min(x, videoWidth));
+                const clampY = Math.max(0, Math.min(y, videoHeight));
+                
+                // 计算原始视频坐标（考虑缩放比例）
+                const scaleX = video.videoWidth / videoWidth;
+                const scaleY = video.videoHeight / videoHeight;
+                
+                const srcX = clampX * scaleX;
+                const srcY = clampY * scaleY;
+                
+                // 计算裁剪区域大小（原始视频中）
+                const cropSize = magnifierSize / zoomFactor;
+                
+                // 确保裁剪区域在视频范围内
+                let cropX = srcX - cropSize / 2;
+                let cropY = srcY - cropSize / 2;
+                
+                if (cropX < 0) cropX = 0;
+                if (cropY < 0) cropY = 0;
+                if (cropX + cropSize > video.videoWidth) cropX = video.videoWidth - cropSize;
+                if (cropY + cropSize > video.videoHeight) cropY = video.videoHeight - cropSize;
+                
+                // 更新放大镜位置（相对于视频容器）
+                magnifier.style.display = 'block';
+                magnifier.style.left = (x - magnifierSize/2) + 'px';
+                magnifier.style.top = (y - magnifierSize/2) + 'px';
+                
+                // 清除并绘制
+                magnifierCtx.clearRect(0, 0, magnifierSize, magnifierSize);
+                magnifierCtx.drawImage(
+                    video,
+                    cropX, cropY, cropSize, cropSize,
+                    0, 0, magnifierSize, magnifierSize
+                );
+            });
+            
+            // 鼠标离开视频
+            video.addEventListener('mouseout', () => {
+                magnifier.style.display = 'none';
+            });
+            
+            // 重置按钮
+            document.getElementById('resetBtn').addEventListener('click', () => {
+                videoContainer.scrollLeft = 0;
+                videoContainer.scrollTop = 0;
+            });
+            
+            // 视频加载完成时设置初始尺寸
+            video.addEventListener('loadedmetadata', () => {
+                videoContainer.style.width = `${video.videoWidth}px`;
+                videoContainer.style.height = `${video.videoHeight}px`;
+            });
+        });
+    </script>
+</body>
+</html>

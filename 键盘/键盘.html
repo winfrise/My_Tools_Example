@@ -1,0 +1,131 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Virtual Keyboard</title>
+    <style>
+        body {
+            margin: 0;
+            padding: 20px;
+            background-color: #000;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            font-family: Arial, sans-serif;
+        }
+
+        .keyboard {
+            display: grid;
+            grid-template-columns: repeat(14, 1fr);
+            gap: 8px;
+            max-width: 800px;
+            width: 100%;
+        }
+
+        .key {
+            background-color: rgba(34, 34, 34, 0.75);
+            border: 1px solid #666;
+            border-radius: 5px;
+            color: #fff;
+            font-size: 14px;
+            text-align: center;
+            padding: 10px 0;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.5);
+            cursor: pointer;
+            transition: background-color 0.2s, transform 0.1s;
+        }
+
+        .key:active {
+            background-color: rgba(51, 51, 51, 0.75);
+            transform: translateY(2px);
+        }
+
+        .key.wide {
+            grid-column: span 2;
+        }
+
+        .key.extra-wide {
+            grid-column: span 3;
+        }
+
+        .key.space {
+            grid-column: span 6;
+        }
+        .wrapper {
+            background: url('./images/bg1.png')
+        }
+    </style>
+</head>
+<body>
+    <div class="wrapper">
+    <div class="keyboard" id="keyboard"></div>
+
+    </div>
+
+    <script>
+        const keys = [
+            [
+                ['q'],
+                ['w'],
+                ['e'],
+                ['r'],
+                ['t'],
+                ['y'],
+                ['u'],
+                ['i'],
+                ['o'],
+                ['p']
+            ],
+            [
+                ['a'],
+                ['s'],
+                ['d'],
+                ['f'],
+                ['g'],
+                ['h'],
+                ['j'],
+                ['k'],
+                ['l'],
+            ],
+            [
+                ['z'],
+                ['x'],
+                ['c'],
+                ['v'],
+                ['b'],
+                ['n'],
+                ['m'],
+            ],
+        ];
+
+        const keyboard = document.getElementById('keyboard');
+
+        keys.forEach(row => {
+            row.forEach(key => {
+                const keyElement = document.createElement('div');
+                keyElement.className = 'key';
+                keyElement.textContent = key;
+
+                if (key === 'Backspace' || key === 'Tab' || key === 'Caps Lock' || key === 'Enter' || key === 'Shift' || key === 'Ctrl' || key === 'Alt') {
+                    keyElement.classList.add('wide');
+                }
+
+                if (key === 'Space') {
+                    keyElement.classList.add('space');
+                }
+
+                keyboard.appendChild(keyElement);
+            });
+        });
+
+        document.querySelectorAll('.key').forEach(key => {
+            key.addEventListener('click', () => {
+                console.log(`Key pressed: ${key.textContent}`);
+                // Here you can add the logic to handle the key press
+            });
+        });
+    </script>
+</body>
+</html>
