@@ -1,0 +1,257 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>随机分数生成器</title>
+  <style>
+    body {
+      font-family: "Segoe UI", "Microsoft YaHei", sans-serif;
+      background: #f5f7fa;
+      margin: 0;
+      padding: 20px;
+      color: #333;
+    }
+    .container {
+      max-width: 800px;
+      margin: 0 auto;
+      background: white;
+      padding: 30px;
+      border-radius: 12px;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.08);
+    }
+    h1 {
+      text-align: center;
+      color: #4a6cf7;
+      margin-bottom: 25px;
+    }
+    .score-display {
+      font-size: 64px;
+      font-weight: bold;
+      text-align: center;
+      margin: 20px 0;
+      color: #2d3748;
+      min-height: 80px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    .buttons {
+      display: flex;
+      gap: 12px;
+      justify-content: center;
+      flex-wrap: wrap;
+      margin: 20px 0;
+    }
+    button {
+      padding: 12px 24px;
+      font-size: 16px;
+      border: none;
+      border-radius: 8px;
+      cursor: pointer;
+      transition: all 0.2s;
+      font-weight: 600;
+    }
+    #generateBtn {
+      background: #4a6cf7;
+      color: white;
+    }
+    #copyBtn {
+      background: #48bb78;
+      color: white;
+    }
+    #generateAndCopyBtn {
+      background: #ed64a6;
+      color: white;
+    }
+    button:hover {
+      opacity: 0.9;
+      transform: translateY(-2px);
+    }
+    button:disabled {
+      opacity: 0.6;
+      cursor: not-allowed;
+      transform: none;
+    }
+
+    .history {
+      margin-top: 30px;
+    }
+    .history h2 {
+      color: #4a5568;
+      border-bottom: 1px solid #e2e8f0;
+      padding-bottom: 8px;
+    }
+    .categories {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+      gap: 20px;
+      margin-top: 15px;
+    }
+    .category {
+      background: #f8fafc;
+      border: 1px solid #e2e8f0;
+      border-radius: 8px;
+      padding: 15px;
+    }
+    .category h3 {
+      margin: 0 0 10px 0;
+      font-size: 18px;
+      color: #2b6cb0;
+    }
+    .score-list {
+      list-style: none;
+      padding: 0;
+      margin: 0;
+      max-height: 150px;
+      overflow-y: auto;
+    }
+    .score-list li {
+      padding: 6px 0;
+      font-family: monospace;
+      font-size: 16px;
+    }
+    .notification {
+      position: fixed;
+      top: 20px;
+      right: 20px;
+      background: #48bb78;
+      color: white;
+      padding: 12px 24px;
+      border-radius: 6px;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+      opacity: 0;
+      transform: translateX(100%);
+      transition: all 0.3s ease;
+      z-index: 1000;
+    }
+    .notification.show {
+      opacity: 1;
+      transform: translateX(0);
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>🎯 随机分数生成器</h1>
+
+    <div class="score-display" id="scoreDisplay">--</div>
+
+    <div class="buttons">
+      <button id="generateBtn">生成分数</button>
+      <button id="copyBtn" disabled>复制分数</button>
+      <button id="generateAndCopyBtn">生成并复制分数</button>
+    </div>
+
+    <div class="history">
+      <h2>📊 历史记录（按分数段分类）</h2>
+      <div class="categories">
+        <div class="category">
+          <h3>90–95 分 (20%)</h3>
+          <ul id="list90" class="score-list"></ul>
+        </div>
+        <div class="category">
+          <h3>80–90 分 (60%)</h3>
+          <ul id="list80" class="score-list"></ul>
+        </div>
+        <div class="category">
+          <h3>60–80 分 (20%)</h3>
+          <ul id="list60" class="score-list"></ul>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="notification" id="notification">已复制到剪贴板！</div>
+
+  <script>
+    // 存储历史记录
+    const history = {
+      '90-95': [],
+      '80-90': [],
+      '60-80': []
+    };
+
+    let currentScore = null;
+
+    // 生成符合概率分布的分数
+    function generateScore() {
+      const rand = Math.random();
+      let score;
+
+      if (rand < 0.7) {
+        // 80-90 分 (60%)
+        score = Math.floor(Math.random() * 11) + 80; // 80 ～ 90
+      } else if (rand < 0.9) {
+        // 60-80 分 (20%)
+        score = Math.floor(Math.random() * 20) + 60; // 60 ～ 79
+      } else {
+        // 90-95 分 (20%)
+        score = Math.floor(Math.random() * 6) + 90; // 90 ～ 95
+      }
+
+      return score;
+    }
+
+    // 更新显示
+    function updateDisplay(score) {
+      currentScore = score;
+      document.getElementById('scoreDisplay').textContent = score;
+      document.getElementById('copyBtn').disabled = false;
+
+      // 分类存储
+      if (score >= 90 && score <= 95) {
+        history['90-95'].unshift(score);
+        addToList('list90', score);
+      } else if (score >= 80 && score < 90) {
+        history['80-90'].unshift(score);
+        addToList('list80', score);
+      } else if (score >= 60 && score < 80) {
+        history['60-80'].unshift(score);
+        addToList('list60', score);
+      }
+    }
+
+    function addToList(listId, score) {
+      const list = document.getElementById(listId);
+      const li = document.createElement('li');
+      li.textContent = score;
+      list.insertBefore(li, list.firstChild);
+    }
+
+    // 复制到剪贴板
+    async function copyScore() {
+      if (currentScore === null) return;
+      try {
+        await navigator.clipboard.writeText(currentScore.toString());
+        showNotification();
+      } catch (err) {
+        console.error('复制失败:', err);
+        alert('复制失败，请手动复制。');
+      }
+    }
+
+    function showNotification() {
+      const notif = document.getElementById('notification');
+      notif.classList.add('show');
+      setTimeout(() => {
+        notif.classList.remove('show');
+      }, 2000);
+    }
+
+    // 绑定事件
+    document.getElementById('generateBtn').addEventListener('click', () => {
+      const score = generateScore();
+      updateDisplay(score);
+    });
+
+    document.getElementById('copyBtn').addEventListener('click', copyScore);
+
+    document.getElementById('generateAndCopyBtn').addEventListener('click', () => {
+      const score = generateScore();
+      updateDisplay(score);
+      setTimeout(copyScore, 100); // 确保 DOM 已更新
+    });
+  </script>
+</body>
+</html>
